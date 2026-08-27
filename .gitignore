@@ -1,0 +1,26 @@
+# ── Node ──────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── Build output ───────────────────────────────────────
+dist/
+build/
+.vite/
+
+# ── Playwright test artifacts ──────────────────────────
+test-results/
+playwright-report/
+
+# ── Environment / secrets ──────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Claude Code ────────────────────────────────────────
+**/.claude/settings.local.json
+**/.claude/worktrees/
+
+# ── OS / editor ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json

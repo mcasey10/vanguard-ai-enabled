@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-vg-ink bg-white;
+  }
+}
+
+@keyframes beacon-pulse {
+  0%   { transform: scale(1.0); opacity: 1.0; }
+  50%  { transform: scale(1.4); opacity: 0.5; }
+  100% { transform: scale(1.0); opacity: 1.0; }
+}
+
+.coach-mark-beacon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;        /* tap target padding without affecting layout */
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.coach-mark-beacon span {
+  animation: beacon-pulse 2s ease-in-out infinite;
+}
