@@ -6,7 +6,7 @@ import { formatCurrency, formatCurrencyCompact, formatPercent } from '../utils/f
 
 // ---------------------------------------------------------------------------
 // Seed canonical scenarios for prototype demo (VT8 + VT9 variations)
-// All values from pm/08-sample-dataset.json — never recalled from memory.
+// All values from dev/src/data/sample-dataset.json — never recalled from memory.
 // Call on mount when store.scenarios is empty.
 // ---------------------------------------------------------------------------
 function seedCanonicalScenarios(portfolio: Portfolio | null): SavedScenario[] {

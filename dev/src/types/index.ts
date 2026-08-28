@@ -2,7 +2,7 @@
  * TypeScript interfaces for the Vanguard Sell & Rebalance tool.
  *
  * Entity numbering follows PRD 07 (Logical Data Model).
- * Field names match pm/08-sample-dataset.json exactly — not PRD 07 prose,
+ * Field names match dev/src/data/sample-dataset.json exactly — not PRD 07 prose,
  * since the loader must parse the canonical JSON directly.
  */
 
@@ -156,7 +156,7 @@ export interface Account {
   account_balance: number
   rmd_applicable: boolean
   settlement_account_id: string
-  masked_number: string         // display suffix, e.g. "...4782" (from pm/08-sample-dataset.json)
+  masked_number: string         // display suffix, e.g. "...4782" (from dev/src/data/sample-dataset.json)
   holdings: FundHolding[]
   rmd_record?: RMDRecord       // populated from rmd_records[] where account_id matches
 }

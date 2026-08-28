@@ -1,11 +1,7 @@
 /**
  * Data loader — reads canonical dataset and handles localStorage persistence.
  *
- * Single source of truth: pm/08-sample-dataset.json (repo root).
- * Do NOT create a copy in dev/src/data/ — import directly from the path
- * Vite resolves via the alias configured in vite.config.ts, or via
- * a relative path from the built output. We use a JSON import with the
- * Vite ?url suffix approach or direct import.
+ * Single source of truth: dev/src/data/sample-dataset.json (this directory).
  *
  * localStorage key: 'vsr_portfolio_state'  (REQ-PS-001)
  * All functions gracefully handle localStorage unavailable or corrupted data.
@@ -16,9 +12,8 @@ import type { Portfolio, PortfolioState, TransactionRecord, Account, RMDRecord }
 // ---------------------------------------------------------------------------
 // Import canonical dataset
 // Vite treats JSON imports as ES modules; the path is relative to this file.
-// dev/src/data/loader.ts → ../../.. is repo root → pm/08-sample-dataset.json
 // ---------------------------------------------------------------------------
-import rawDataset from '../../../pm/08-sample-dataset.json'
+import rawDataset from './sample-dataset.json'
 
 const LS_KEY = 'vsr_portfolio_state'
 const DATASET_VERSION = '1.0'

@@ -1,0 +1,1072 @@
+{
+  "dataset_metadata": {
+    "version": "1.0",
+    "description": "Canonical sample dataset for Vanguard Sell & Rebalance tool \u2014 PM/PD/Dev phase",
+    "as_of_date": "2026-04-11",
+    "note_investor_age": "Investor age is set to 73 to satisfy RMD coverage case (Case 4). The sample data brief specified 'early 60s' but age 73 is required for RMD applicability under SECURE 2.0 (RMD age threshold). Dev and PD teams should note this reconciliation. All other portfolio characteristics \u2014 20+ years of accumulation, multi-fund balanced portfolio, ~$850,000 total value \u2014 are preserved as specified.",
+    "note_tax_treatment": "Cost basis is recorded per lot in all accounts for lot-tracking purposes. Tax treatment on withdrawal differs by account type: taxable brokerage accounts realize capital gains at applicable ST/LT rates; traditional IRA distributions are taxed as ordinary income regardless of lot-level gains/losses \u2014 the optimization engine must not apply capital gains logic to IRA withdrawals; Roth IRA qualified distributions are tax-free. The optimization engine must account for these differences per REQ-OE-010.",
+    "note_specific_lot_id": "Specific lot identification is available in taxable and Roth IRA accounts per Vanguard policy. Traditional IRA accounts support FIFO and average cost only \u2014 specific lot identification is not available for IRA accounts. This constrains available_accounting_methods per account type.",
+    "nav_prices": {
+      "VTSAX": 145.2,
+      "VTIAX": 38.75,
+      "VBIRX": 10.42,
+      "VBTLX": 10.36,
+      "VFIAX": 548.3,
+      "VFITX": 10.85
+    }
+  },
+  "user": {
+    "user_id": "USR-20260411-001",
+    "display_name": "Margaret R. Ellison",
+    "age": 73,
+    "birth_year": 1953,
+    "first_session_completed": true,
+    "prior_session": {
+      "session_id": "SES-20260310-001",
+      "session_status": "completed",
+      "session_duration_minutes": 18,
+      "scenario_saved": true,
+      "note": "This prior session state satisfies Case 10 (returning user, completed session). To test Case 11 (deep-link suppression), set session_duration_minutes to 4 and scenario_saved to false. To test Case 10 (deep-link offered, incomplete session), set session_status to 'incomplete' and scenario_saved to true and session_duration_minutes to 12."
+    }
+  },
+  "portfolio": {
+    "portfolio_id": "PRT-20260411-001",
+    "user_id": "USR-20260411-001",
+    "total_investable_balance": 870619.4,
+    "current_allocation": {
+      "domestic_equity_pct": 41.75,
+      "international_equity_pct": 16.02,
+      "domestic_bonds_pct": 32.53,
+      "short_term_reserves_pct": 9.69
+    }
+  },
+  "target_allocation": {
+    "allocation_id": "TGT-20260411-001",
+    "portfolio_id": "PRT-20260411-001",
+    "domestic_equity_pct": 40.0,
+    "international_equity_pct": 15.0,
+    "domestic_bonds_pct": 35.0,
+    "short_term_reserves_pct": 10.0,
+    "fund_level_targets": null,
+    "source": "vanguard_allocation_wizard",
+    "as_of_date": "2024-11-15",
+    "note": "To test Case 3 (no target allocation, graceful degradation to tax-only mode), remove this object from the dataset or set it to null at the portfolio level."
+  },
+  "accounts": [
+    {
+      "account_id": "ACCT-TAXABLE-001",
+      "portfolio_id": "PRT-20260411-001",
+      "account_type": "taxable_brokerage",
+      "account_balance": 513802.4,
+      "rmd_applicable": false,
+      "settlement_account_id": "SETT-001",
+      "holdings": [
+        {
+          "fund_id": "VTSAX",
+          "fund_name": "Vanguard Total Stock Market Index Fund Admiral Shares",
+          "asset_class": "domestic_equity",
+          "total_shares": 1597,
+          "current_balance": 231884.4,
+          "current_allocation_weight_pct": 27.28,
+          "available_accounting_methods": [
+            "FIFO",
+            "average_cost",
+            "specific_lot_identification"
+          ],
+          "unrealized_st_gain_loss": 4723.6,
+          "unrealized_lt_gain_loss": 114277.5,
+          "total_unrealized_gain_loss": 119001.1,
+          "total_cost_basis": 112883.3,
+          "lots": [
+            {
+              "lot_id": "T-VTSAX-01",
+              "acquisition_date": "2004-03-15",
+              "shares": 200,
+              "cost_basis_per_share": 35.2,
+              "total_cost_basis": 7040.0,
+              "current_nav": 145.2,
+              "current_value": 29040.0,
+              "unrealized_gain_loss": 22000.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTSAX-02",
+              "acquisition_date": "2008-11-20",
+              "shares": 300,
+              "cost_basis_per_share": 25.4,
+              "total_cost_basis": 7620.0,
+              "current_nav": 145.2,
+              "current_value": 43560.0,
+              "unrealized_gain_loss": 35940.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTSAX-03",
+              "acquisition_date": "2012-06-10",
+              "shares": 250,
+              "cost_basis_per_share": 45.8,
+              "total_cost_basis": 11450.0,
+              "current_nav": 145.2,
+              "current_value": 36300.0,
+              "unrealized_gain_loss": 24850.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTSAX-04",
+              "acquisition_date": "2016-09-15",
+              "shares": 200,
+              "cost_basis_per_share": 62.3,
+              "total_cost_basis": 12460.0,
+              "current_nav": 145.2,
+              "current_value": 29040.0,
+              "unrealized_gain_loss": 16580.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTSAX-05",
+              "acquisition_date": "2020-04-01",
+              "shares": 150,
+              "cost_basis_per_share": 72.5,
+              "total_cost_basis": 10875.0,
+              "current_nav": 145.2,
+              "current_value": 21780.0,
+              "unrealized_gain_loss": 10905.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTSAX-06",
+              "acquisition_date": "2023-07-15",
+              "shares": 100,
+              "cost_basis_per_share": 110.2,
+              "total_cost_basis": 11020.0,
+              "current_nav": 145.2,
+              "current_value": 14520.0,
+              "unrealized_gain_loss": 3500.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTSAX-07",
+              "acquisition_date": "2024-11-10",
+              "shares": 75,
+              "cost_basis_per_share": 117.37,
+              "total_cost_basis": 8802.75,
+              "current_nav": 145.2,
+              "current_value": 10890.0,
+              "unrealized_gain_loss": 2087.25,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "note": "Acquired Nov 10 2024; LT conversion date was Nov 10 2025, already LT as of April 11 2026."
+            },
+            {
+              "lot_id": "T-VTSAX-08",
+              "acquisition_date": "2025-08-15",
+              "shares": 150,
+              "cost_basis_per_share": 132.4,
+              "total_cost_basis": 19860.0,
+              "current_nav": 145.2,
+              "current_value": 21780.0,
+              "unrealized_gain_loss": 1920.0,
+              "holding_period": "ST",
+              "days_to_lt_conversion": 126,
+              "lt_conversion_date": "2026-08-15"
+            },
+            {
+              "lot_id": "T-VTSAX-09",
+              "acquisition_date": "2025-11-20",
+              "shares": 172,
+              "cost_basis_per_share": 130.53,
+              "total_cost_basis": 22451.16,
+              "current_nav": 145.2,
+              "current_value": 24974.4,
+              "unrealized_gain_loss": 2523.24,
+              "holding_period": "ST",
+              "days_to_lt_conversion": 223,
+              "lt_conversion_date": "2026-11-20",
+              "wait_and_save_flag": true,
+              "wait_and_save_detail": {
+                "days_until_lt": 223,
+                "lt_conversion_date": "2026-11-20",
+                "unrealized_gain": 1515.85,
+                "tax_if_sold_now_st_rate_24pct": 363.8,
+                "tax_if_sold_after_conversion_lt_rate_15pct": 326.77,
+                "estimated_tax_savings_by_waiting": 37.03,
+                "note": "WAIT & SAVE LOT. Acquired 2025-11-20 (corrected from erroneous 2025-06-20); LT conversion date 2026-11-20 (1-year anniversary). days_until_lt is 223 from dataset as_of_date 2026-04-11, consistent with T-VTIAX-07 and all other lots in this file. PRD 10 Verification Table 8 states '166 days' using reference date 2026-05-27 \u2014 correct arithmetic from that date is 177 days; 166 days would require reference date 2026-06-07. PRD 10's 166-day figure is internally inconsistent with its own stated reference date (off by 11 days). unrealized_gain $1,515.85 and tax figures are for the 103.306 SpecID-selected shares per VT8; $37.03 savings figure is from VT8 and does not reconcile arithmetically with $1,515.85 gain at 24%/15% rates (which would yield $136.43 savings) \u2014 the $37.03 discrepancy in VT8 is a separate unresolved inconsistency."
+              }
+            }
+          ]
+        },
+        {
+          "fund_id": "VTIAX",
+          "fund_name": "Vanguard Total International Stock Index Fund Admiral Shares",
+          "asset_class": "international_equity",
+          "total_shares": 3600,
+          "current_balance": 139500.0,
+          "current_allocation_weight_pct": 16.41,
+          "available_accounting_methods": [
+            "FIFO",
+            "average_cost",
+            "specific_lot_identification"
+          ],
+          "unrealized_st_gain_loss": 620.0,
+          "unrealized_lt_gain_loss": 31800.0,
+          "total_unrealized_gain_loss": 32420.0,
+          "total_cost_basis": 107080.0,
+          "lots": [
+            {
+              "lot_id": "T-VTIAX-01",
+              "acquisition_date": "2006-05-20",
+              "shares": 500,
+              "cost_basis_per_share": 18.4,
+              "total_cost_basis": 9200.0,
+              "current_nav": 38.75,
+              "current_value": 19375.0,
+              "unrealized_gain_loss": 10175.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTIAX-02",
+              "acquisition_date": "2010-08-15",
+              "shares": 700,
+              "cost_basis_per_share": 22.6,
+              "total_cost_basis": 15820.0,
+              "current_nav": 38.75,
+              "current_value": 27125.0,
+              "unrealized_gain_loss": 11305.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTIAX-03",
+              "acquisition_date": "2015-03-10",
+              "shares": 400,
+              "cost_basis_per_share": 28.9,
+              "total_cost_basis": 11560.0,
+              "current_nav": 38.75,
+              "current_value": 15500.0,
+              "unrealized_gain_loss": 3940.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTIAX-04",
+              "acquisition_date": "2019-11-20",
+              "shares": 500,
+              "cost_basis_per_share": 32.4,
+              "total_cost_basis": 16200.0,
+              "current_nav": 38.75,
+              "current_value": 19375.0,
+              "unrealized_gain_loss": 3175.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTIAX-05",
+              "acquisition_date": "2022-06-10",
+              "shares": 600,
+              "cost_basis_per_share": 34.2,
+              "total_cost_basis": 20520.0,
+              "current_nav": 38.75,
+              "current_value": 23250.0,
+              "unrealized_gain_loss": 2730.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VTIAX-06",
+              "acquisition_date": "2024-09-05",
+              "shares": 500,
+              "cost_basis_per_share": 27.2,
+              "total_cost_basis": 13600.0,
+              "current_nav": 38.75,
+              "current_value": 19375.0,
+              "unrealized_gain_loss": 5775.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "note": "Acquired Sept 5 2024; LT conversion date was Sept 5 2025, already LT as of April 11 2026."
+            },
+            {
+              "lot_id": "T-VTIAX-07",
+              "acquisition_date": "2025-04-25",
+              "shares": 400,
+              "cost_basis_per_share": 37.2,
+              "total_cost_basis": 14880.0,
+              "current_nav": 38.75,
+              "current_value": 15500.0,
+              "unrealized_gain_loss": 620.0,
+              "holding_period": "ST",
+              "days_to_lt_conversion": 14,
+              "lt_conversion_date": "2026-04-25",
+              "wait_and_save_flag": true,
+              "wait_and_save_detail": {
+                "days_until_lt": 14,
+                "lt_conversion_date": "2026-04-25",
+                "unrealized_gain": 620.0,
+                "tax_if_sold_now_st_rate_24pct": 148.8,
+                "tax_if_sold_after_conversion_lt_rate_15pct": 93.0,
+                "estimated_tax_savings_by_waiting": 55.8,
+                "note": "PRIMARY WAIT & SAVE LOT. Selling this lot before April 25 2026 realizes $620.00 at 24% ST rate ($148.80 tax). Waiting 14 days converts to LT, taxed at 15% ($93.00). Estimated tax savings by waiting: $55.80."
+              }
+            }
+          ]
+        },
+        {
+          "fund_id": "VBIRX",
+          "fund_name": "Vanguard Short-Term Bond Index Fund Admiral Shares",
+          "asset_class": "short_term_reserves",
+          "total_shares": 8100,
+          "current_balance": 84402.0,
+          "current_allocation_weight_pct": 9.93,
+          "available_accounting_methods": [
+            "FIFO",
+            "average_cost",
+            "specific_lot_identification"
+          ],
+          "unrealized_st_gain_loss": 0.0,
+          "unrealized_lt_gain_loss": -891.0,
+          "total_unrealized_gain_loss": -891.0,
+          "total_cost_basis": 85293.0,
+          "lots": [
+            {
+              "lot_id": "T-VBIRX-01",
+              "acquisition_date": "2018-04-10",
+              "shares": 2000,
+              "cost_basis_per_share": 10.35,
+              "total_cost_basis": 20700.0,
+              "current_nav": 10.42,
+              "current_value": 20840.0,
+              "unrealized_gain_loss": 140.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VBIRX-02",
+              "acquisition_date": "2021-08-20",
+              "shares": 2500,
+              "cost_basis_per_share": 10.65,
+              "total_cost_basis": 26625.0,
+              "current_nav": 10.42,
+              "current_value": 26050.0,
+              "unrealized_gain_loss": -575.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "harvestable_loss_flag": true,
+              "harvestable_loss_detail": {
+                "unrealized_loss": -575.0,
+                "holding_period": "LT",
+                "note": "HARVESTABLE LOSS. Selling this lot realizes a $575.00 LT loss available to offset LT or ST realized gains."
+              }
+            },
+            {
+              "lot_id": "T-VBIRX-03",
+              "acquisition_date": "2023-02-15",
+              "shares": 1500,
+              "cost_basis_per_share": 10.78,
+              "total_cost_basis": 16170.0,
+              "current_nav": 10.42,
+              "current_value": 15630.0,
+              "unrealized_gain_loss": -540.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "harvestable_loss_flag": true,
+              "harvestable_loss_detail": {
+                "unrealized_loss": -540.0,
+                "holding_period": "LT",
+                "note": "HARVESTABLE LOSS. Selling this lot realizes a $540.00 LT loss available to offset realized gains."
+              }
+            },
+            {
+              "lot_id": "T-VBIRX-04",
+              "acquisition_date": "2024-06-10",
+              "shares": 2100,
+              "cost_basis_per_share": 10.38,
+              "total_cost_basis": 21798.0,
+              "current_nav": 10.42,
+              "current_value": 21882.0,
+              "unrealized_gain_loss": 84.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "note": "Acquired June 10 2024; LT conversion date was June 10 2025, already LT as of April 11 2026."
+            }
+          ]
+        },
+        {
+          "fund_id": "VBTLX",
+          "fund_name": "Vanguard Total Bond Market Index Fund Admiral Shares",
+          "asset_class": "domestic_bonds",
+          "total_shares": 5600,
+          "current_balance": 58016.0,
+          "current_allocation_weight_pct": 6.05,
+          "available_accounting_methods": [
+            "FIFO",
+            "average_cost",
+            "specific_lot_identification"
+          ],
+          "unrealized_st_gain_loss": 684.0,
+          "unrealized_lt_gain_loss": -2375.0,
+          "total_unrealized_gain_loss": -1691.0,
+          "total_cost_basis": 59707.0,
+          "lots": [
+            {
+              "lot_id": "T-VBTLX-01",
+              "acquisition_date": "2019-07-15",
+              "shares": 1500,
+              "cost_basis_per_share": 11.2,
+              "total_cost_basis": 16800.0,
+              "current_nav": 10.36,
+              "current_value": 15540.0,
+              "unrealized_gain_loss": -1260.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "harvestable_loss_flag": true,
+              "harvestable_loss_detail": {
+                "unrealized_loss": -1260.0,
+                "holding_period": "LT",
+                "note": "HARVESTABLE LOSS. Selling this lot realizes a $3,030.00 LT loss. Largest single harvestable loss in taxable account."
+              }
+            },
+            {
+              "lot_id": "T-VBTLX-02",
+              "acquisition_date": "2021-10-20",
+              "shares": 2000,
+              "cost_basis_per_share": 11.45,
+              "total_cost_basis": 22900.0,
+              "current_nav": 10.36,
+              "current_value": 20720.0,
+              "unrealized_gain_loss": -2180.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "harvestable_loss_flag": true,
+              "harvestable_loss_detail": {
+                "unrealized_loss": -2180.0,
+                "holding_period": "LT",
+                "note": "HARVESTABLE LOSS. Selling this lot realizes a $4,540.00 LT loss. Largest harvestable loss in the entire taxable account."
+              }
+            },
+            {
+              "lot_id": "T-VBTLX-03",
+              "acquisition_date": "2023-05-10",
+              "shares": 1500,
+              "cost_basis_per_share": 9.65,
+              "total_cost_basis": 14475.0,
+              "current_nav": 10.36,
+              "current_value": 15540.0,
+              "unrealized_gain_loss": 1065.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "T-VBTLX-04",
+              "acquisition_date": "2025-09-20",
+              "shares": 600,
+              "cost_basis_per_share": 9.22,
+              "total_cost_basis": 5532.0,
+              "current_nav": 10.36,
+              "current_value": 6216.0,
+              "unrealized_gain_loss": 684.0,
+              "holding_period": "ST",
+              "days_to_lt_conversion": 162,
+              "lt_conversion_date": "2026-09-20"
+            }
+          ]
+        }
+      ],
+      "masked_number": "...4782"
+    },
+    {
+      "account_id": "ACCT-TRAD-IRA-001",
+      "portfolio_id": "PRT-20260411-001",
+      "account_type": "traditional_IRA",
+      "account_balance": 225225.0,
+      "rmd_applicable": true,
+      "settlement_account_id": "SETT-001",
+      "note_tax_treatment": "Withdrawals from this account are taxed as ordinary income regardless of lot-level gain/loss. Capital gains rate logic does not apply. The optimization engine must treat IRA withdrawals as ordinary income events.",
+      "holdings": [
+        {
+          "fund_id": "VBTLX",
+          "fund_name": "Vanguard Total Bond Market Index Fund Admiral Shares",
+          "asset_class": "domestic_bonds",
+          "total_shares": 12000,
+          "current_balance": 124320.0,
+          "current_allocation_weight_pct": 12.96,
+          "available_accounting_methods": [
+            "FIFO",
+            "average_cost"
+          ],
+          "unrealized_st_gain_loss": 0.0,
+          "unrealized_lt_gain_loss": 3726.0,
+          "total_unrealized_gain_loss": 3726.0,
+          "total_cost_basis": 120594.0,
+          "lots": [
+            {
+              "lot_id": "IRA-VBTLX-01",
+              "acquisition_date": "2008-03-20",
+              "shares": 3000,
+              "cost_basis_per_share": 9.85,
+              "total_cost_basis": 29550.0,
+              "current_nav": 10.36,
+              "current_value": 31080.0,
+              "unrealized_gain_loss": 1530.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VBTLX-02",
+              "acquisition_date": "2012-07-15",
+              "shares": 2000,
+              "cost_basis_per_share": 10.1,
+              "total_cost_basis": 20200.0,
+              "current_nav": 10.36,
+              "current_value": 20720.0,
+              "unrealized_gain_loss": 520.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VBTLX-03",
+              "acquisition_date": "2016-11-10",
+              "shares": 1800,
+              "cost_basis_per_share": 10.55,
+              "total_cost_basis": 18990.0,
+              "current_nav": 10.36,
+              "current_value": 18648.0,
+              "unrealized_gain_loss": -342.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VBTLX-04",
+              "acquisition_date": "2020-05-15",
+              "shares": 2000,
+              "cost_basis_per_share": 11.2,
+              "total_cost_basis": 22400.0,
+              "current_nav": 10.36,
+              "current_value": 20720.0,
+              "unrealized_gain_loss": -1680.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VBTLX-05",
+              "acquisition_date": "2023-08-10",
+              "shares": 1500,
+              "cost_basis_per_share": 9.3,
+              "total_cost_basis": 13950.0,
+              "current_nav": 10.36,
+              "current_value": 15540.0,
+              "unrealized_gain_loss": 1590.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VBTLX-06",
+              "acquisition_date": "2024-08-20",
+              "shares": 1700,
+              "cost_basis_per_share": 9.12,
+              "total_cost_basis": 15504.0,
+              "current_nav": 10.36,
+              "current_value": 17612.0,
+              "unrealized_gain_loss": 2108.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "note": "Acquired Aug 20 2024; LT conversion date was Aug 20 2025, already LT as of April 11 2026."
+            }
+          ]
+        },
+        {
+          "fund_id": "VFITX",
+          "fund_name": "Vanguard Intermediate-Term Treasury Index Fund Admiral Shares",
+          "asset_class": "domestic_bonds",
+          "total_shares": 9300,
+          "current_balance": 100905.0,
+          "current_allocation_weight_pct": 11.87,
+          "available_accounting_methods": [
+            "FIFO",
+            "average_cost"
+          ],
+          "unrealized_st_gain_loss": -15.0,
+          "unrealized_lt_gain_loss": 1000.0,
+          "total_unrealized_gain_loss": 985.0,
+          "total_cost_basis": 99920.0,
+          "lots": [
+            {
+              "lot_id": "IRA-VFITX-01",
+              "acquisition_date": "2009-06-15",
+              "shares": 2000,
+              "cost_basis_per_share": 10.4,
+              "total_cost_basis": 20800.0,
+              "current_nav": 10.85,
+              "current_value": 21700.0,
+              "unrealized_gain_loss": 900.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VFITX-02",
+              "acquisition_date": "2014-03-20",
+              "shares": 2500,
+              "cost_basis_per_share": 10.6,
+              "total_cost_basis": 26500.0,
+              "current_nav": 10.85,
+              "current_value": 27125.0,
+              "unrealized_gain_loss": 625.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VFITX-03",
+              "acquisition_date": "2018-09-10",
+              "shares": 2000,
+              "cost_basis_per_share": 10.9,
+              "total_cost_basis": 21800.0,
+              "current_nav": 10.85,
+              "current_value": 21700.0,
+              "unrealized_gain_loss": -100.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VFITX-04",
+              "acquisition_date": "2022-04-15",
+              "shares": 1500,
+              "cost_basis_per_share": 11.2,
+              "total_cost_basis": 16800.0,
+              "current_nav": 10.85,
+              "current_value": 16275.0,
+              "unrealized_gain_loss": -525.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "IRA-VFITX-05",
+              "acquisition_date": "2024-10-05",
+              "shares": 1000,
+              "cost_basis_per_share": 10.75,
+              "total_cost_basis": 10750.0,
+              "current_nav": 10.85,
+              "current_value": 10850.0,
+              "unrealized_gain_loss": 100.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "note": "Acquired Oct 5 2024; LT conversion date was Oct 5 2025, already LT as of April 11 2026."
+            },
+            {
+              "lot_id": "IRA-VFITX-06",
+              "acquisition_date": "2025-06-15",
+              "shares": 300,
+              "cost_basis_per_share": 10.9,
+              "total_cost_basis": 3270.0,
+              "current_nav": 10.85,
+              "current_value": 3255.0,
+              "unrealized_gain_loss": -15.0,
+              "holding_period": "ST",
+              "days_to_lt_conversion": 65,
+              "lt_conversion_date": "2026-06-15"
+            }
+          ]
+        }
+      ],
+      "masked_number": "...2973"
+    },
+    {
+      "account_id": "ACCT-ROTH-IRA-001",
+      "portfolio_id": "PRT-20260411-001",
+      "account_type": "roth_IRA",
+      "account_balance": 131592.0,
+      "rmd_applicable": false,
+      "settlement_account_id": "SETT-001",
+      "note_tax_treatment": "Qualified Roth IRA distributions are tax-free. The optimization engine must not apply capital gains tax logic to Roth IRA withdrawals. Cost basis is recorded for contribution tracking purposes only.",
+      "holdings": [
+        {
+          "fund_id": "VFIAX",
+          "fund_name": "Vanguard 500 Index Fund Admiral Shares",
+          "asset_class": "domestic_equity",
+          "total_shares": 240,
+          "current_balance": 131592.0,
+          "current_allocation_weight_pct": 15.49,
+          "available_accounting_methods": [
+            "FIFO",
+            "average_cost",
+            "specific_lot_identification"
+          ],
+          "unrealized_st_gain_loss": 524.0,
+          "unrealized_lt_gain_loss": 56642.5,
+          "total_unrealized_gain_loss": 57166.5,
+          "total_cost_basis": 74425.5,
+          "lots": [
+            {
+              "lot_id": "ROTH-VFIAX-01",
+              "acquisition_date": "2010-04-15",
+              "shares": 50,
+              "cost_basis_per_share": 105.2,
+              "total_cost_basis": 5260.0,
+              "current_nav": 548.3,
+              "current_value": 27415.0,
+              "unrealized_gain_loss": 22155.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "ROTH-VFIAX-02",
+              "acquisition_date": "2014-08-20",
+              "shares": 40,
+              "cost_basis_per_share": 185.4,
+              "total_cost_basis": 7416.0,
+              "current_nav": 548.3,
+              "current_value": 21932.0,
+              "unrealized_gain_loss": 14516.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "ROTH-VFIAX-03",
+              "acquisition_date": "2018-01-15",
+              "shares": 35,
+              "cost_basis_per_share": 260.8,
+              "total_cost_basis": 9128.0,
+              "current_nav": 548.3,
+              "current_value": 19190.5,
+              "unrealized_gain_loss": 10062.5,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "ROTH-VFIAX-04",
+              "acquisition_date": "2020-09-10",
+              "shares": 30,
+              "cost_basis_per_share": 348.6,
+              "total_cost_basis": 10458.0,
+              "current_nav": 548.3,
+              "current_value": 16449.0,
+              "unrealized_gain_loss": 5991.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "ROTH-VFIAX-05",
+              "acquisition_date": "2022-12-20",
+              "shares": 25,
+              "cost_basis_per_share": 420.3,
+              "total_cost_basis": 10507.5,
+              "current_nav": 548.3,
+              "current_value": 13707.5,
+              "unrealized_gain_loss": 3200.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null
+            },
+            {
+              "lot_id": "ROTH-VFIAX-06",
+              "acquisition_date": "2024-07-15",
+              "shares": 20,
+              "cost_basis_per_share": 512.4,
+              "total_cost_basis": 10248.0,
+              "current_nav": 548.3,
+              "current_value": 10966.0,
+              "unrealized_gain_loss": 718.0,
+              "holding_period": "LT",
+              "days_to_lt_conversion": null,
+              "note": "Acquired July 15 2024; LT conversion date was July 15 2025, already LT as of April 11 2026."
+            },
+            {
+              "lot_id": "ROTH-VFIAX-07",
+              "acquisition_date": "2025-11-10",
+              "shares": 40,
+              "cost_basis_per_share": 535.2,
+              "total_cost_basis": 21408.0,
+              "current_nav": 548.3,
+              "current_value": 21932.0,
+              "unrealized_gain_loss": 524.0,
+              "holding_period": "ST",
+              "days_to_lt_conversion": 213,
+              "lt_conversion_date": "2026-11-10"
+            }
+          ]
+        }
+      ],
+      "masked_number": "...8148"
+    }
+  ],
+  "rmd_records": [
+    {
+      "rmd_id": "RMD-2026-001",
+      "account_id": "ACCT-TRAD-IRA-001",
+      "tax_year": 2026,
+      "account_balance_prior_year_end": 208500.0,
+      "irs_life_expectancy_factor": 26.5,
+      "rmd_required_for_year": 7867.92,
+      "rmd_distributed_ytd": 4200.0,
+      "rmd_remaining": 3667.92,
+      "as_of_date": "2026-04-10",
+      "source": "vanguard_rmd_calculation_system",
+      "note": "RMD calculated per IRS Uniform Lifetime Table for investor age 73. Factor 26.5 applied to Dec 31 2025 account balance of $208,500.00. $4,200.00 distributed Jan 2026 (first quarterly distribution). Remaining balance of $3,667.92 due before Dec 31 2026."
+    }
+  ],
+  "ytd_gains_record": {
+    "ytd_id": "YTD-2026-001",
+    "portfolio_id": "PRT-20260411-001",
+    "tax_year": 2026,
+    "st_gains_realized_ytd": 1245.0,
+    "lt_gains_realized_ytd": 8750.0,
+    "as_of_date": "2026-04-10",
+    "data_completeness_flag": "complete",
+    "source": "vanguard_tax_records_system",
+    "note": "ST gain of $1,245.00 from VTSAX lot sold January 2026. LT gain of $8,750.00 from VTIAX lot sold February 2026. All transactions through April 10 2026 reflected. To test Case 9 (YTD data unavailable), remove this object or simulate a retrieval failure.",
+    "ytd_context_for_withdrawal_planning": {
+      "combined_ytd_gains": 9995.0,
+      "note": "An additional withdrawal that realizes gains will add to the $9,995.00 already realized YTD. At default 15% LT rate, each $10,000 of additional LT gain adds $1,500 to estimated 2026 tax liability."
+    }
+  },
+  "computed_aggregates": {
+    "as_of_date": "2026-04-11",
+    "computation_method": "All figures computed bottom-up from lot-level data. Each figure is independently verifiable against the lot tables above.",
+    "by_fund": {
+      "VTSAX": {
+        "account": "ACCT-TAXABLE-001",
+        "total_shares": 1597,
+        "total_cost_basis": 111578.91,
+        "current_value": 231884.4,
+        "total_unrealized_gain_loss": 120305.49,
+        "unrealized_st_gain_loss": 4443.24,
+        "unrealized_lt_gain_loss": 115862.25,
+        "lot_count": 9,
+        "st_lot_count": 2,
+        "lt_lot_count": 7
+      },
+      "VTIAX": {
+        "account": "ACCT-TAXABLE-001",
+        "total_shares": 3600,
+        "total_cost_basis": 101780.0,
+        "current_value": 139500.0,
+        "total_unrealized_gain_loss": 37720.0,
+        "unrealized_st_gain_loss": 620.0,
+        "unrealized_lt_gain_loss": 37100.0,
+        "lot_count": 7,
+        "st_lot_count": 1,
+        "lt_lot_count": 6
+      },
+      "VBIRX": {
+        "account": "ACCT-TAXABLE-001",
+        "total_shares": 8100,
+        "total_cost_basis": 85293.0,
+        "current_value": 84402.0,
+        "total_unrealized_gain_loss": -891.0,
+        "unrealized_st_gain_loss": 0,
+        "unrealized_lt_gain_loss": -891.0,
+        "lot_count": 4,
+        "st_lot_count": 0,
+        "lt_lot_count": 4
+      },
+      "VBTLX_taxable": {
+        "account": "ACCT-TAXABLE-001",
+        "total_shares": 5600,
+        "total_cost_basis": 59707.0,
+        "current_value": 58016.0,
+        "total_unrealized_gain_loss": -1691.0,
+        "unrealized_st_gain_loss": 684.0,
+        "unrealized_lt_gain_loss": -2375.0,
+        "lot_count": 4,
+        "st_lot_count": 1,
+        "lt_lot_count": 3
+      },
+      "VBTLX_traditional_IRA": {
+        "account": "ACCT-TRAD-IRA-001",
+        "total_shares": 12000,
+        "total_cost_basis": 120594.0,
+        "current_value": 124320.0,
+        "total_unrealized_gain_loss": 3726.0,
+        "unrealized_st_gain_loss": 0.0,
+        "unrealized_lt_gain_loss": 3726.0,
+        "lot_count": 6,
+        "st_lot_count": 0,
+        "lt_lot_count": 6
+      },
+      "VFITX_traditional_IRA": {
+        "account": "ACCT-TRAD-IRA-001",
+        "total_shares": 9300,
+        "total_cost_basis": 99920.0,
+        "current_value": 100905.0,
+        "total_unrealized_gain_loss": 985.0,
+        "unrealized_st_gain_loss": -15.0,
+        "unrealized_lt_gain_loss": 1000.0,
+        "lot_count": 6,
+        "st_lot_count": 1,
+        "lt_lot_count": 5
+      },
+      "VFIAX_roth_IRA": {
+        "account": "ACCT-ROTH-IRA-001",
+        "total_shares": 240,
+        "total_cost_basis": 74425.5,
+        "current_value": 131592.0,
+        "total_unrealized_gain_loss": 57166.5,
+        "unrealized_st_gain_loss": 524.0,
+        "unrealized_lt_gain_loss": 56642.5,
+        "lot_count": 7,
+        "st_lot_count": 1,
+        "lt_lot_count": 6
+      }
+    },
+    "by_account": {
+      "ACCT-TAXABLE-001": {
+        "current_value": 513802.4,
+        "total_cost_basis": 364963.3,
+        "total_unrealized_gain_loss": 148839.1,
+        "fund_balances": {
+          "VTSAX": 231884.4,
+          "VTIAX": 139500.0,
+          "VBIRX": 84402.0,
+          "VBTLX": 58016.0,
+          "sum_check": 513802.4
+        }
+      },
+      "ACCT-TRAD-IRA-001": {
+        "current_value": 225225.0,
+        "total_cost_basis": 220514.0,
+        "total_unrealized_gain_loss": 4711.0,
+        "fund_balances": {
+          "VBTLX": 124320.0,
+          "VFITX": 100905.0,
+          "sum_check": 225225.0
+        }
+      },
+      "ACCT-ROTH-IRA-001": {
+        "current_value": 131592.0,
+        "total_cost_basis": 74425.5,
+        "total_unrealized_gain_loss": 57166.5,
+        "fund_balances": {
+          "VFIAX": 131592.0,
+          "sum_check": 131592.0
+        }
+      }
+    },
+    "portfolio_totals": {
+      "total_current_value": 870619.4,
+      "total_cost_basis": 659902.8,
+      "total_unrealized_gain_loss": 210716.6,
+      "account_sum_check": {
+        "taxable": 513802.4,
+        "traditional_IRA": 225225.0,
+        "roth_IRA": 131592.0,
+        "total": 870619.4
+      },
+      "total_lot_count": 43,
+      "st_lot_count": 6,
+      "lt_lot_count": 37
+    },
+    "allocation_by_asset_class": {
+      "domestic_equity": {
+        "funds_included": [
+          "VTSAX (ACCT-TAXABLE-001)",
+          "VFIAX (ACCT-ROTH-IRA-001)"
+        ],
+        "current_value": 363476.4,
+        "current_pct": 42.77,
+        "target_pct": 40.0,
+        "drift_pct": 2.77,
+        "drift_direction": "overweight",
+        "drift_dollar_value": 23543.77
+      },
+      "international_equity": {
+        "funds_included": [
+          "VTIAX (ACCT-TAXABLE-001)"
+        ],
+        "current_value": 139500.0,
+        "current_pct": 16.41,
+        "target_pct": 15.0,
+        "drift_pct": 1.41,
+        "drift_direction": "overweight",
+        "drift_dollar_value": 11982.91
+      },
+      "domestic_bonds": {
+        "funds_included": [
+          "VBTLX (ACCT-TAXABLE-001)",
+          "VBTLX (ACCT-TRAD-IRA-001)",
+          "VFITX (ACCT-TRAD-IRA-001)"
+        ],
+        "current_value": 283241.0,
+        "current_pct": 32.53,
+        "target_pct": 35.0,
+        "drift_pct": -2.47,
+        "drift_direction": "underweight",
+        "drift_dollar_value": -21504.3
+      },
+      "short_term_reserves": {
+        "funds_included": [
+          "VBIRX (ACCT-TAXABLE-001)"
+        ],
+        "current_value": 84402.0,
+        "current_pct": 9.93,
+        "target_pct": 10.0,
+        "drift_pct": -0.07,
+        "drift_direction": "on_target",
+        "drift_dollar_value": -596.5
+      }
+    },
+    "special_condition_flags": {
+      "wait_and_save_lots": [
+        {
+          "lot_id": "T-VTIAX-07",
+          "fund": "VTIAX",
+          "account": "ACCT-TAXABLE-001",
+          "shares": 400,
+          "days_to_lt_conversion": 14,
+          "lt_conversion_date": "2026-04-25",
+          "unrealized_gain": 620.0,
+          "tax_if_sold_now_at_24pct_st": 148.8,
+          "tax_if_sold_after_conversion_at_15pct_lt": 93.0,
+          "estimated_tax_savings_by_waiting": 55.8
+        },
+        {
+          "lot_id": "T-VTSAX-09",
+          "fund": "VTSAX",
+          "account": "ACCT-TAXABLE-001",
+          "shares": 172,
+          "days_to_lt_conversion": 223,
+          "lt_conversion_date": "2026-11-20",
+          "unrealized_gain": 1515.85,
+          "tax_if_sold_now_at_24pct_st": 363.8,
+          "tax_if_sold_after_conversion_at_15pct_lt": 326.77,
+          "estimated_tax_savings_by_waiting": 37.03
+        }
+      ],
+      "harvestable_loss_lots_taxable_account": [
+        {
+          "lot_id": "T-VBIRX-02",
+          "fund": "VBIRX",
+          "unrealized_loss": -575.0,
+          "holding_period": "LT"
+        },
+        {
+          "lot_id": "T-VBIRX-03",
+          "fund": "VBIRX",
+          "unrealized_loss": -540.0,
+          "holding_period": "LT"
+        },
+        {
+          "lot_id": "T-VBTLX-01",
+          "fund": "VBTLX",
+          "unrealized_loss": -1260.0,
+          "holding_period": "LT"
+        },
+        {
+          "lot_id": "T-VBTLX-02",
+          "fund": "VBTLX",
+          "unrealized_loss": -2180.0,
+          "holding_period": "LT"
+        }
+      ],
+      "total_harvestable_loss_taxable_account": -4555.0,
+      "large_withdrawal_threshold": {
+        "threshold_amount": 84985.14,
+        "threshold_pct": 10.0,
+        "portfolio_value": 849851.4,
+        "note": "Any withdrawal exceeding $84,985.14 triggers the soft informational notice at Step A2 per REQ-A2-003. Example withdrawal amounts that exercise Case 8: $90,000, $95,000, $100,000."
+      }
+    }
+  }
+}

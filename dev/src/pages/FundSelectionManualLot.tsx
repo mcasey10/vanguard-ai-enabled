@@ -21,7 +21,7 @@ function RadioDot({ selected }: { selected: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// Canonical lot data (from pm/08-sample-dataset.json — never recalled from memory)
+// Canonical lot data (from dev/src/data/sample-dataset.json — never recalled from memory)
 // NAV: VTSAX $145.20, VBTLX $9.18
 // ---------------------------------------------------------------------------
 
