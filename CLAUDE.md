@@ -6,6 +6,11 @@ This is the single living context artifact for this project. Read it in full bef
 
 **Standing rule — read this before every session, follow it at the end of every session:** roles (PM/PD/Dev) persist as jurisdiction over judgment, not as sequential phases. Work whatever section of this project needs attention next; there is no gate requiring one role's pass to finish before another's begins, except where a decision is genuinely dependent on an earlier one (e.g., you cannot write a boundary rule for a feature that hasn't been scoped). When a decision is made, log it in `DECISIONS.md` immediately, tagged with the role-lens that produced it (PM/PD/Dev), **before ending the session** — a session that ends without that write is exactly how context got lost in the predecessor project (manual copy-paste between Claude Chat and Claude Code, occasionally skipped to save credits). This file and `DECISIONS.md` are the entire mechanism that replaces that relay. If they're not kept current, the mechanism doesn't work, regardless of which tool you're in.
 
+**Standing engagement expectations** (generalized from the market-data session — see `DECISIONS.md` D033–D037 for where these came from):
+- Before editing any value that other computed fields, tests, or UI locations might derive from, check for cascading dependencies first — don't assume a field is isolated.
+- When a problem seems to present exactly two options, treat that as worth a second look rather than a given — check whether a third option avoids a real cost that both original options share.
+- Prefer surfacing an assumption or an unresolved tradeoff explicitly over resolving it silently in whichever direction is easiest to implement.
+
 ## 1. Project relationship and scope
 
 This project adds an embedded AI interpretive/generative layer to the **Vanguard Sell & Rebalance** application, which was fully built, deployed, and documented in a separate, prior, now-untouched portfolio project (a three-role PM/PD/Dev pipeline across Notion/Jira/GitHub/Figma). That original project's repository remains the complete historical record and is not modified or referenced from within this repo — no cross-repo links belong in this file. (The relationship between the two projects is described externally, in portfolio/case-study materials, not here.)
@@ -18,9 +23,12 @@ This project's own thesis, distinct from feature delivery: test whether role-bas
 
 **Rejected candidates** (see `DECISIONS.md` D004 for full reasoning): voice/chat-based Order Confirmation entry (wrong risk/value ratio at the highest-stakes, currently input-free stage); document ingestion for holdings extraction (violates bottom-up data construction, no UI precedent, high hallucination risk).
 
+**Standing principle — genuine generation, not simulation** (project-wide, governs both features, not just Feature 1 — see `DECISIONS.md` D038): All "AI-generated" or "AI-assisted" content in this application must be produced by an actual call to a language model at runtime — never templating, deterministic string assembly, or any other simulated mechanism, regardless of implementation convenience or infrastructure cost.
+
 ## 2. Pointers (don't restate what's already true elsewhere — go look)
 
 - **This repo's calculation engine**: `dev/src/engine/` (module referenced independently of any screen — this is what makes both features architecturally viable: neither has to reimplement calculation logic, both call the same module Fund Selection already calls).
+- **This repo's narration engine**: `dev/api/narrate.ts` (Vercel serverless function, Anthropic API) plus its shared core logic and the client-side calling module — see §7 for the full contract. Narrative generation lives outside the calculation engine entirely, per CD-4.2 and the standing principle in §1.
 - **Live previous-project application** — `https://vanguard-ai-pipeline-jade.vercel.app/` (reset via `?reset=true`). First-line source of truth for existing UI behavior and visual design. Check this and the design-system spec before consulting anything else, including this file's own notes, if there's any doubt about current behavior.
 - **Canonical workflow spec (HTML)** — `pm/sell_rebalance_workflow.html` in the previous project's repo (fetch live; do not trust a cached copy) — field-by-field states for all four stages, current as of v3.
 - **PRD 04** (Notion) — canonical user journey and segment definitions (Segments A–D). Superseded the old Workflow A/B step structure; use this, not `pm/CLAUDE.md`'s stale description.
@@ -79,7 +87,14 @@ Before any AI-generated output ships in either feature, it must satisfy:
 - Pure explanation. The AI may only describe values the engine has already computed; it may never state, estimate, or imply a figure itself.
 - Every generated block must respect the EST. TAX / EST. NET TAX distinction exactly as computed.
 - Applies identically at all four touchpoints — one spec, four call sites, not four bespoke specs.
-- Disclosure per CD-1.2 required at each touchpoint (visually distinct from static/deterministic text).
+- Disclosure per CD-1.2 required at each touchpoint (visually distinct from static/deterministic text) — **only when the content shown actually came from the model.** See fallback rule below for the case where it didn't.
+
+**Narration engine architecture** (see `DECISIONS.md` D038):
+- Generation is a real Anthropic API call at runtime, per §1's standing principle — not templating or deterministic assembly. Implemented as a minimal Vercel serverless function, `dev/api/narrate.ts`, wrapping shared core logic also used for local dev-server parity and for direct unit testing.
+- **Input/output contract is the CD-4.2 boundary made architectural, not just conventional**: the function receives only already-engine-computed structured figures (fund/lot identifiers, amounts, gain/loss figures, tax figures, allocation deltas, flags, and — when not excluded — the market-context figure). It never receives raw account data and never performs any calculation. It returns prose text only.
+- **Tests mock the API call.** Same precedent as the market-data rules below (no live network dependency in tests) — not a separate decision, the same one applied to a second live-data source.
+- **Failure fallback differs from the market-data sentence's rule on purpose.** Market context is supplementary — omitting it silently on failure is fine (rule 2 below). Narration is the *primary* content at all four touchpoints, so on API failure the touchpoint falls back to a plain, deterministic summary of the same structured figures rather than blank space. That fallback **must not** carry the CD-1.2 AI-generated badge — it genuinely isn't AI-generated in that state, so the badge stays honest in both the success and failure case rather than becoming a fixed label that's sometimes false.
+- **Caching**: narration is memoized client-side by a stable hash of the full input payload (touchpoint + structured figures, including market-context/exclusion state) for the session. Decided explicitly, not a silent default — see D038 for the reasoning.
 - **Market-data rules** (governs the third narration input, live market-performance context — see `DECISIONS.md` D028–D031, D037):
   1. May state only a percentage return between two real dates — never an absolute price, real or fictional, in the same sentence or surrounding narration.
   2. The figure is a static, precomputed dataset value verified once at authoring time, never a live runtime fetch — no failure-handling or test-mocking logic is needed for it as a result.
@@ -116,6 +131,6 @@ Before any AI-generated output ships in either feature, it must satisfy:
 
 These are the acceptance-criteria categories both features build toward, not a description of what's already implemented — check `DECISIONS.md` for build-status entries before assuming any of these are covered yet.
 
-**Narration (Feature 1) — 10 categories:** pure gain / pure loss-harvest / mixed gain+harvest / ST-LT crossing / Traditional IRA ordinary-income framing / allocation toward-target / allocation away-from-target / Wait & Save triggered / SpecID lot-level active / same figures across two segment tones / multi-fund (3+) aggregation.
+**Narration (Feature 1) — 11 categories:** pure gain / pure loss-harvest / mixed gain+harvest / ST-LT crossing / Traditional IRA ordinary-income framing / allocation toward-target / allocation away-from-target / Wait & Save triggered / SpecID lot-level active / same figures across two segment tones / multi-fund (3+) aggregation / **market-context exclusion-check mechanism** — verifies the narration code actually consults `dataset_metadata.market_context_exclusions` for the (fund, lot) pairing being narrated before including a market-context sentence, not just that the one hardcoded VFITX/IRA-VFITX-06 case happens to render correctly. Added post-D037, once the exclusion pattern existed to have a mechanism to test.
 
 **What-if (Feature 2) — 9 categories:** clean unambiguous delta / vague-relative quantity requiring clarification / objective-shaped request mapping to Tax-first or Balance-first / full specification with explicit cost-basis methods / multi-turn with inline lot-level detail / SpecID requested on Traditional IRA (must refuse) / requested amount exceeding position size (must catch, not pass to engine) / ambiguous fund reference requiring disambiguation / out-of-scope general-advice request (must decline per assistive-not-directive posture).
