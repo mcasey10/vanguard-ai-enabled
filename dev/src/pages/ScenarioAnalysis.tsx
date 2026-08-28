@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 import type { SavedScenario, Portfolio } from '../types'
 import { formatCurrency, formatCurrencyCompact, formatPercent } from '../utils/format'
+import { NarrationBlock } from '../components/NarrationBlock'
+import { buildScenarioNarrationInput } from '../utils/narrationBuilders'
 
 // ---------------------------------------------------------------------------
 // Seed canonical scenarios for prototype demo (VT8 + VT9 variations)
@@ -422,7 +424,22 @@ function ScenarioColumn({ scenario, index, portfolio, activeTaxRates, onEdit, on
 
       {/* SecE — tradeoff summary */}
       <div className="bg-[#fff8e8] border-b border-[#e8e9e9] p-[16px] flex-1">
-        <p className="text-[13px] text-[#040505] leading-normal">{scenario.tradeoff_summary}</p>
+        {portfolio
+          ? <NarrationBlock
+              textClassName="text-[13px] text-[#040505] leading-normal"
+              input={buildScenarioNarrationInput({
+                scenario,
+                portfolio,
+                // SavedScenario doesn't track which account it was built
+                // against; scenarios are single-account (built from a
+                // single-account Recommendation/ManualConfiguration — see
+                // OptimizationParams.activeAccountId), and every scenario in
+                // this build is against the taxable account. See DECISIONS.md.
+                accountType: 'taxable_brokerage',
+                segment: 'A',
+              })}
+            />
+          : <p className="text-[13px] text-[#040505] leading-normal">{scenario.tradeoff_summary}</p>}
       </div>
 
       {/* SecF — action buttons */}

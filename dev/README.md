@@ -32,6 +32,7 @@ Runs at `http://localhost:5173`
 | E2E tests | Playwright |
 | CI | GitHub Actions |
 | Deployment | Vercel |
+| Backend | Vercel serverless function (`api/narrate.ts`) — Anthropic API |
 
 **Baseline test results, this repo:** see `DECISIONS.md` for the most recent Vitest/Playwright run against this copy of the app — the original project's release-tag/commit reference no longer applies here since this repo's git history was stripped on import.
 
@@ -62,9 +63,13 @@ The engine implements a dual-objective optimization: minimize realized capital g
 
 Unit tests cover: lot selection ordering, short/long-term gain classification, wash-sale exclusions, edge cases (zero-gain lots, insufficient balance, single-lot funds).
 
+## Backend
+
+`api/narrate.ts` is a minimal Vercel serverless function that calls the Anthropic API to generate the Feature 1 narration text (see `CLAUDE.md` §7, `DECISIONS.md` D038). It requires an `ANTHROPIC_API_KEY` environment variable in the Vercel project (or a local `.env` consumed by `vercel dev`) — without one, every touchpoint falls back to a deterministic, non-AI-labeled summary of the same figures rather than failing. `npm run dev` alone (no `vercel dev` needed) also serves this route locally via a Vite dev-server middleware in `vite.config.ts`.
+
 ## Known gaps (post-release)
 
-- No real Vanguard API integration — all data is static sample dataset
+- No real Vanguard API integration — all portfolio/holdings data is static sample dataset. (Unrelated to `api/narrate.ts` above, which is narration-only and never touches account data — see its input/output contract in `CLAUDE.md` §7.)
 - Authentication and account selection are mocked (L1 nav is static)
 - Order submission is simulated — no actual brokerage transaction
 - Transaction history is session-only (not persisted between reloads)

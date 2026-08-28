@@ -12,6 +12,8 @@ import { useAppStore } from '../store/useAppStore'
 import { getTransactionHistory } from '../data/loader'
 import type { TransactionRecord } from '../types'
 import { formatCurrency, formatPercent } from '../utils/format'
+import { NarrationBlock } from '../components/NarrationBlock'
+import { buildExecutionSummaryNarrationInput } from '../utils/narrationBuilders'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -169,6 +171,23 @@ export default function ExecutionSummary() {
             </p>
           </div>
         </div>
+
+        {/* Execution narrative — past-tense summary of what was just sold */}
+        {txn && txn.funds_sold.length > 0 && (
+          <div className="bg-white border border-[#e8e9e9] rounded-[8px] p-[16px] w-full">
+            <NarrationBlock
+              textClassName="text-[13px] text-[#040505] leading-normal"
+              input={buildExecutionSummaryNarrationInput({
+                transaction: txn,
+                portfolio,
+                // TransactionRecord doesn't track account_type; every
+                // transaction in this build is against the taxable account.
+                accountType: 'taxable_brokerage',
+                segment: 'A',
+              })}
+            />
+          </div>
+        )}
 
         {/* Transaction Summary */}
         {txn && txn.funds_sold.length > 0 && (() => {

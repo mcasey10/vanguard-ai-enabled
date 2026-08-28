@@ -12,6 +12,8 @@ import { useAppStore } from '../store/useAppStore'
 import { appendTransaction } from '../data/loader'
 import type { SavedScenario, Recommendation, ManualConfiguration, TransactionRecord, TransactionFundRecord, AccountingMethod, Portfolio, TaxAssumptionSet } from '../types'
 import { formatCurrency } from '../utils/format'
+import { NarrationBlock } from '../components/NarrationBlock'
+import { buildOrderConfirmationNarrationInput } from '../utils/narrationBuilders'
 
 function r2(n: number) { return Math.round(n * 100) / 100 }
 
@@ -343,6 +345,17 @@ export default function OrderConfirmation() {
 
   const data = buildConfirmData(scenario, rec, portfolio, activeAccountId, optimizationPriority, mode, manualConfig, activeTaxRates)
 
+  // Same source precedence buildConfirmData uses above (manual > recommendation > scenario).
+  const activeAccountType = portfolio?.accounts.find(a => a.account_id === activeAccountId)?.account_type ?? 'taxable_brokerage'
+  const narrationSource =
+    mode === 'manual' && manualConfig && manualConfig.fund_results.length > 0
+      ? { kind: 'manual' as const, data: manualConfig }
+      : rec
+      ? { kind: 'recommendation' as const, data: rec }
+      : scenario
+      ? { kind: 'scenario' as const, data: scenario }
+      : null
+
   // If no data available, nothing to confirm — redirect back
   if (!data) {
     return (
@@ -469,6 +482,22 @@ export default function OrderConfirmation() {
                 <span className="text-[20px] font-bold text-[#040505] leading-6">{formatCurrency(data.totalSaleAmount)}</span>
               </div>
             </div>
+
+            {/* Confirmation summary narration — REQ-EC-004: recaps only figures already
+                shown elsewhere, introduces no new information. */}
+            {narrationSource && portfolio && (
+              <div className="bg-white border border-[#e8e9e9] p-[16px] w-full">
+                <NarrationBlock
+                  textClassName="text-[13px] text-[#040505] leading-normal"
+                  input={buildOrderConfirmationNarrationInput({
+                    source: narrationSource,
+                    portfolio,
+                    accountType: activeAccountType,
+                    segment: 'A',
+                  })}
+                />
+              </div>
+            )}
 
             {/* Section 2 — Funds to be sold */}
             <div className="border border-[#e8e9e9] flex flex-col items-start p-[16px] w-full">

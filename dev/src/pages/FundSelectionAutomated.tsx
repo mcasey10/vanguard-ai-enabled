@@ -8,6 +8,8 @@ import { runOptimization, shortAssetClass } from '../engine/index'
 import type { Recommendation } from '../types'
 import { formatCurrency, formatCurrencyCompact, formatShares, formatPercent, accountAllocStr } from '../utils/format'
 import { buildScenarioFromRecommendation, isDuplicateScenario } from '../utils/scenarioBuilder'
+import { NarrationBlock } from '../components/NarrationBlock'
+import { buildFundResultNarrationInput } from '../utils/narrationBuilders'
 
 function RadioDot({ selected }: { selected: boolean }) {
   return (
@@ -418,8 +420,17 @@ export default function FundSelectionAutomated() {
                       </div>
                       <div className="flex-1 h-full" />
                     </div>
-                    <div className="flex h-8 items-center px-4 w-full bg-white">
-                      <p className="text-[13px] italic text-vg-ink-muted">{fr.rationale}</p>
+                    <div className="flex items-center px-4 py-2 w-full bg-white">
+                      <NarrationBlock
+                        input={buildFundResultNarrationInput({
+                          fundResults: [fr],
+                          portfolio,
+                          accountType: 'taxable_brokerage',
+                          segment: 'A',
+                          est_net_tax: rec?.est_net_tax,
+                          effective_rate: rec?.effective_rate,
+                        })}
+                      />
                     </div>
                   </div>
                 )

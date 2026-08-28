@@ -202,6 +202,27 @@ export function appendTransaction(
   }
 }
 
+/**
+ * getMarketContextData — read-only access to the real trailing-12-month
+ * return figures and their exclusion list (dataset_metadata.trailing_12mo_return
+ * / market_context_exclusions — see DECISIONS.md D035/D037). Used only by
+ * the narration input builders (dev/src/utils/narrationBuilders.ts); not
+ * part of the Portfolio type since it's market context, not portfolio data.
+ */
+export function getMarketContextData(): {
+  trailing_12mo_return: Record<string, number>
+  market_context_exclusions: Array<{ fund: string; lot_id: string; reason: string }>
+} {
+  const meta = rawDataset.dataset_metadata as unknown as {
+    trailing_12mo_return?: Record<string, number>
+    market_context_exclusions?: Array<{ fund: string; lot_id: string; reason: string }>
+  }
+  return {
+    trailing_12mo_return: meta.trailing_12mo_return ?? {},
+    market_context_exclusions: meta.market_context_exclusions ?? [],
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------

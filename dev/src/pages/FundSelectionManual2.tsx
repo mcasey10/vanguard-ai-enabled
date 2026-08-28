@@ -12,6 +12,9 @@ import { runOptimization, shortAssetClass } from '../engine/index'
 import type { FundSaleResult, ManualConfiguration } from '../types'
 import { formatCurrency, formatCurrencyCompact, formatShares, formatPercent, accountAllocStr } from '../utils/format'
 import { buildScenarioFromFundResults, isDuplicateScenario } from '../utils/scenarioBuilder'
+import { NarrationBlock } from '../components/NarrationBlock'
+import { buildFundResultNarrationInput } from '../utils/narrationBuilders'
+import type { NarrationInput } from '../utils/narrationShared'
 
 // ---------------------------------------------------------------------------
 // Shared sub-components
@@ -103,6 +106,7 @@ type TaxData = {
 function ActiveFundRow({
   fund,
   taxData,
+  narrationInput,
   appliedCents,
   currentMethod,
   onApply,
@@ -116,6 +120,7 @@ function ActiveFundRow({
 }: {
   fund: FundRow
   taxData: TaxData
+  narrationInput: NarrationInput | null
   appliedCents: number
   currentMethod: CostBasisMethod      // lifted — parent is source of truth
   onApply: (ticker: string, cents: number) => void
@@ -289,7 +294,9 @@ function ActiveFundRow({
       {/* Details Row — 32px: rationale + optional Wait & Save badge + Lot details trigger */}
       <div className="flex h-8 items-center justify-between px-4 w-full bg-white">
         <div className="flex items-center gap-[5px]">
-          <p className="text-[13px] italic text-vg-ink-muted">{taxData.rationale}</p>
+          {narrationInput
+            ? <NarrationBlock input={narrationInput} />
+            : <p className="text-[13px] italic text-vg-ink-muted">{taxData.rationale}</p>}
           {taxData.waitAndSave && (
             <span className="flex items-center gap-1 px-2 py-[2px] rounded-full bg-[#e07000]">
               <span className="text-[9px] font-bold text-white tracking-[0.36px] whitespace-nowrap">
@@ -837,12 +844,13 @@ export default function FundSelectionManual2() {
                   This keeps pre-populated funds (from Automated recommendation) adjacent and stable;
                   activating/deactivating a fund moves it between groups but never splits active rows. */}
               {(() => {
-                const allHoldings = portfolio?.accounts.find(a => a.account_id === activeAccountId)?.holdings ?? []
+                const activeAccount = portfolio?.accounts.find(a => a.account_id === activeAccountId)
+                const allHoldings = activeAccount?.holdings ?? []
                 return [
                   ...allHoldings.filter(h => activeFunds.has(h.fund_id)),
                   ...allHoldings.filter(h => !activeFunds.has(h.fund_id)),
-                ]
-              })().map(holding => {
+                ].map(h => ({ holding: h, accountType: activeAccount!.account_type }))
+              })().map(({ holding, accountType }) => {
                 const fund: FundRow = {
                   ticker: holding.fund_id,
                   fullName: holding.fund_name,
@@ -858,6 +866,12 @@ export default function FundSelectionManual2() {
                       key={fund.ticker}
                       fund={fund}
                       taxData={taxDataFromResult(engineResult)}
+                      narrationInput={engineResult && portfolio ? buildFundResultNarrationInput({
+                        fundResults: [engineResult],
+                        portfolio,
+                        accountType,
+                        segment: 'A',
+                      }) : null}
                       appliedCents={appliedAmounts[fund.ticker] ?? 0}
                       currentMethod={costBasisMethods[fund.ticker] ?? 'MinTax'}
                       onApply={handleApplyAmount}
