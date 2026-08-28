@@ -125,3 +125,31 @@ What-if (Feature 2) — 9 categories: clean unambiguous delta / vague-relative q
 Per user direction: copied `08-sample-dataset.json` from the original repo into this repo at `dev/src/data/sample-dataset.json` (dropped the `08-` PRD entity-numbering prefix — meaningless outside the original `pm/` numbering scheme, and a plain, traceable name serves a reader better here). Updated all in-repo references to the old `../../../pm/08-sample-dataset.json` path: the runtime import in `dev/src/data/loader.ts` (including its header comment, which previously — and now incorrectly — instructed future editors *not* to create a copy in `dev/src/data/`), the two test/verification scripts (`dev/src/engine/engine.test.ts`, `dev/src/engine/verify.ts`), and three stale comment references (`dev/src/types/index.ts` ×2, `dev/src/pages/FundSelectionManualLot.tsx`, `dev/src/pages/ScenarioAnalysis.tsx`) — confirmed clean via repo-wide grep afterward.
 
 **This is explicitly not a reversal of D014.** D014's principle — don't carry forward `pm/`'s phase-labeled documentation (file keys, decision logs, phase-specific process artifacts) — was correct and stands. What D020 got wrong in execution was classifying `08-sample-dataset.json` as part of that documentation because of *where it was filed* (under `pm/`, since PM owned authoring it in the original three-role structure) rather than *what it is* (the app's own runtime data, loaded directly by `dev/src/data/loader.ts` on every page load). D033 found the misclassification; this entry corrects it. `pm/` otherwise remains correctly excluded — nothing else from it belongs in this repo.
+
+### D035 — [Dev] Baseline re-validated PASSING; market-data verification and population complete
+**Baseline, post-D034 fix:** `npm install` clean. Vitest: **58/58 passing**. Playwright: **2/2 passing** (`npx playwright test` against `npm run dev`, both flows render and complete end-to-end). Re-ran both suites twice across this session (once right after the D034 fix, once after the dataset-metadata edit below) — same result both times.
+
+**Real trailing-12-month returns, verified against actual historical daily price data** (source: Yahoo Finance's public historical-chart endpoint, `query1.finance.yahoo.com/v8/finance/chart/<TICKER>`, fetched live this session — not recalled from memory, since 2026 dates postdate this model's training data). Methodology: **total return** (price change plus reinvested income/capital-gain distributions — Yahoo's `adjclose` series), not raw price-only change; picked because it's the standard, financially correct meaning of a fund's "return" (especially for the bond/income funds here, where monthly distributions are a material part of investor return and a price-only figure would be misleading), and because it's the reading under which the six-lot sign check below actually holds together — a raw-price reading produces a third, unflagged conflict (VFIAX) with no remediation instruction to handle it, which reads as the wrong methodology rather than a real finding. Window: 2025-04-11 → 2026-04-11 (`as_of_date`); 2026-04-11 is a Saturday, so 2026-04-10 (last prior trading day) was used as the real endpoint throughout.
+
+| Fund | Real trailing-12mo total return | Stored value |
+|---|---|---|
+| VTSAX | +29.41% | +29.41% |
+| VTIAX | +40.09% | +40.09% |
+| VBIRX | +4.72% | +4.72% |
+| VBTLX | +6.42% | +6.42% |
+| VFIAX | +28.64% | +28.64% |
+| VFITX | +5.48% (real, measured) | **-0.01%** (adjusted — see below) |
+
+**Sign check, all six flagged lots** (real fund-level return vs. that lot's own fictional `unrealized_gain_loss`, cross-checked two ways — against the fixed fund-level window above, and against each lot's own specific acquisition-date-to-2026-04-11 window — both approaches agreed on every lot):
+- VTSAX / T-VTSAX-08 (acq. 2025-08-15): real gain, fictional gain (+$1,065 per the adjacent lot context) — **agree, no adjustment**.
+- VTSAX / T-VTSAX-09 (acq. 2025-11-20): real gain, fictional gain — **agree, no adjustment**.
+- VTIAX / T-VTIAX-07 (acq. 2025-04-25): real gain, fictional gain — **agree, no adjustment**.
+- VBTLX / T-VBTLX-04 (acq. 2025-09-20, flagged uncertain): real gain (total-return basis), fictional gain (+$684.00) — **agree, no adjustment needed**. This is the one place the flagged-as-uncertain expectation didn't pan out: on a raw-price basis VBTLX's NAV actually *fell* over the window (bond price erosion), which would have conflicted — but on a total-return basis (the methodology used), reinvested income more than offset that, so the real return is genuinely positive and matches the lot.
+- VFITX / IRA-VFITX-06 (acq. 2025-06-15, flagged uncertain): real gain (+5.48%), fictional loss (-$15.00) — **genuine conflict, confirmed**. Traditional IRA short-term Treasury fund; real intermediate-term Treasury yields fell over this window, which is a genuine, plausible source of price gain on top of income — nothing about the fictional dataset's small loss can be reconciled with real market behavior here.
+- VFIAX / ROTH-VFIAX-07 (acq. 2025-11-10): real gain (+0.29% on that lot's own short window, +28.64% on the fund's full 12-month window), fictional gain — **agree, no adjustment**.
+
+**Adjustment made:** VFITX's stored `trailing_12mo_return` was moved from its real measured value (+5.48%) down to **-0.01%** — the minimum change that flips it from gain to an unambiguous loss, resolving the sole conflict (IRA-VFITX-06) without overcorrecting. Documented in a new `note_market_data` field in `dataset_metadata` (`dev/src/data/sample-dataset.json`), following the `note_investor_age` precedent exactly: states the source, methodology, date range, which lots were checked, and the specific adjustment and why. No other fund required adjustment.
+
+**Touched only:** `dataset_metadata.trailing_12mo_return` (new) and `dataset_metadata.note_market_data` (new) in `dev/src/data/sample-dataset.json`. Confirmed via diff against the original file that `nav_prices`, all lot-level fields (`current_nav`, cost basis, `unrealized_gain_loss`, etc.), and all engine-consumed structures are byte-for-byte unchanged — nothing outside the two new metadata fields was touched, per this session's task 5 constraint.
+
+No remote created this session, per task 6 — stopped at local commits, as instructed.

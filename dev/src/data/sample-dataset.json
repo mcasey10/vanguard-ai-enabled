@@ -13,7 +13,16 @@
       "VBTLX": 10.36,
       "VFIAX": 548.3,
       "VFITX": 10.85
-    }
+    },
+    "trailing_12mo_return": {
+      "VTSAX": 29.41,
+      "VTIAX": 40.09,
+      "VBIRX": 4.72,
+      "VBTLX": 6.42,
+      "VFIAX": 28.64,
+      "VFITX": -0.01
+    },
+    "note_market_data": "trailing_12mo_return is a real, static, precomputed total return per fund (price change plus reinvested income/capital-gain distributions, i.e. Yahoo Finance adjusted-close), from 2025-04-11 to 2026-04-11 (as_of_date; nearest trading day used where the endpoint fell on a weekend — 2026-04-10). It is unrelated to nav_prices/current_nav, which remain fictional and must never be blended with it (see CLAUDE.md §7 market-data rules). Verified against each of the six lots whose acquisition_date falls inside that 12-month window, comparing the real return's sign to that lot's own fictional unrealized_gain_loss: VTSAX (T-VTSAX-08, T-VTSAX-09), VTIAX (T-VTIAX-07), VBTLX (T-VBTLX-04), and VFIAX (ROTH-VFIAX-07) all agreed (real gain vs. fictional gain) and needed no change. VFITX conflicted: the real trailing-12-month total return measured +5.48%, but lot IRA-VFITX-06 (Traditional IRA, acquired 2025-06-15) shows a fictional unrealized loss of -$15.00. Adjusted VFITX's stored trailing_12mo_return from +5.48% down to -0.01% — the minimum change that flips it to an unambiguous loss and removes the sign conflict — rather than leaving the real, measured figure in place to contradict that lot's own numbers."
   },
   "user": {
     "user_id": "USR-20260411-001",
