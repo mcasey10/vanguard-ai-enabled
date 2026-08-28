@@ -80,10 +80,10 @@ Before any AI-generated output ships in either feature, it must satisfy:
 - Every generated block must respect the EST. TAX / EST. NET TAX distinction exactly as computed.
 - Applies identically at all four touchpoints — one spec, four call sites, not four bespoke specs.
 - Disclosure per CD-1.2 required at each touchpoint (visually distinct from static/deterministic text).
-- **Market-data rules** (governs the third narration input, live market-performance context — see `DECISIONS.md` D028–D031):
+- **Market-data rules** (governs the third narration input, live market-performance context — see `DECISIONS.md` D028–D031, D037):
   1. May state only a percentage return between two real dates — never an absolute price, real or fictional, in the same sentence or surrounding narration.
   2. The figure is a static, precomputed dataset value verified once at authoring time, never a live runtime fetch — no failure-handling or test-mocking logic is needed for it as a result.
-  3. Any deliberate adjustment to a stored value, made to resolve a genuine real-vs-fictional conflict, must be documented in a new `note_market_data` field in `dataset_metadata`, following the exact precedent of the existing `note_investor_age` field — never resolved silently.
+  3. **Never fabricate or overwrite a verified real figure to force agreement with the fictional dataset, and never adjust a fictional value without first checking for cascading dependencies** (other display locations, self-consistency/rollup fields — see `DECISIONS.md` D036 for what that check looks like). When a genuine real-vs-fictional conflict is found for a specific fund/lot pairing: if the fictional side can be adjusted safely (no cascading dependents), adjust it and document the change in `note_market_data`, following the precedent of the existing `note_investor_age` field. If it can't be adjusted safely, add an entry to `dataset_metadata.market_context_exclusions` (fund, lot_id, reason) instead and suppress the narration for that specific pairing — the real figure stays as-fetched, the fictional side stays untouched, and the conflict is documented, not resolved silently either way.
 
 ## 8. AI/code boundary spec — Feature 2 (what-if assistant)
 
