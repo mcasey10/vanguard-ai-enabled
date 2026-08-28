@@ -1,12 +1,8 @@
-# Dev Phase — Development
+# Application — Vanguard AI-Enabled Sell & Rebalance
 
-This directory contains the full React application built during the Development phase of the Vanguard AI Pipeline project.
+This directory contains the React application this project extends with an embedded AI interpretive/generative layer. See the repo root [`CLAUDE.md`](../CLAUDE.md) for full project context — this project doesn't use the phase-based structure the app was originally built under.
 
-**Timeline:** June 17 – July 9, 2026  
-**Role:** Developer (AI-assisted)  
-**Tools:** Claude Code, Figma MCP
-
-## Live deployment
+## Live deployment (original, unmodified application — see `CLAUDE.md` §2)
 
 | URL | Description |
 |-----|-------------|
@@ -37,7 +33,7 @@ Runs at `http://localhost:5173`
 | CI | GitHub Actions |
 | Deployment | Vercel |
 
-**Test results at release tag `dev-phase-complete` (commit 923323b):** 58/58 unit tests passing · 2/2 Playwright E2E flows passing
+**Baseline test results, this repo:** see `DECISIONS.md` for the most recent Vitest/Playwright run against this copy of the app — the original project's release-tag/commit reference no longer applies here since this repo's git history was stripped on import.
 
 ## Directory structure
 
@@ -74,6 +70,6 @@ Unit tests cover: lot selection ordering, short/long-term gain classification, w
 - Transaction history is session-only (not persisted between reloads)
 - Mobile layout is present but not optimized — designed for 1440px desktop
 
-## Notion workspace
+## Notion workspace (reference-only for this project — see `CLAUDE.md` §2, §9)
 
-Dev phase context and requirements: https://www.notion.so/Vanguard-Sell-Rebalance-PRD-33edcac9574a808da907cc9decefb512
+PRD 04 (canonical user journeys and segment definitions): https://www.notion.so/Vanguard-Sell-Rebalance-PRD-33edcac9574a808da907cc9decefb512

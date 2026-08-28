@@ -21,7 +21,7 @@ This project's own thesis, distinct from feature delivery: test whether role-bas
 ## 2. Pointers (don't restate what's already true elsewhere — go look)
 
 - **This repo's calculation engine**: `dev/src/engine/` (module referenced independently of any screen — this is what makes both features architecturally viable: neither has to reimplement calculation logic, both call the same module Fund Selection already calls).
-- **Live previous-project application** — first-line source of truth for existing UI behavior and visual design. Check this and the design-system spec before consulting anything else, including this file's own notes, if there's any doubt about current behavior.
+- **Live previous-project application** — `https://vanguard-ai-pipeline-jade.vercel.app/` (reset via `?reset=true`). First-line source of truth for existing UI behavior and visual design. Check this and the design-system spec before consulting anything else, including this file's own notes, if there's any doubt about current behavior.
 - **Canonical workflow spec (HTML)** — `pm/sell_rebalance_workflow.html` in the previous project's repo (fetch live; do not trust a cached copy) — field-by-field states for all four stages, current as of v3.
 - **PRD 04** (Notion) — canonical user journey and segment definitions (Segments A–D). Superseded the old Workflow A/B step structure; use this, not `pm/CLAUDE.md`'s stale description.
 - **PRD 11** (Notion) — conversational design requirements (CD-1 through CD-6). This is the PM-authored governance layer both features must satisfy — see §6.
@@ -80,6 +80,10 @@ Before any AI-generated output ships in either feature, it must satisfy:
 - Every generated block must respect the EST. TAX / EST. NET TAX distinction exactly as computed.
 - Applies identically at all four touchpoints — one spec, four call sites, not four bespoke specs.
 - Disclosure per CD-1.2 required at each touchpoint (visually distinct from static/deterministic text).
+- **Market-data rules** (governs the third narration input, live market-performance context — see `DECISIONS.md` D028–D031):
+  1. May state only a percentage return between two real dates — never an absolute price, real or fictional, in the same sentence or surrounding narration.
+  2. The figure is a static, precomputed dataset value verified once at authoring time, never a live runtime fetch — no failure-handling or test-mocking logic is needed for it as a result.
+  3. Any deliberate adjustment to a stored value, made to resolve a genuine real-vs-fictional conflict, must be documented in a new `note_market_data` field in `dataset_metadata`, following the exact precedent of the existing `note_investor_age` field — never resolved silently.
 
 ## 8. AI/code boundary spec — Feature 2 (what-if assistant)
 
@@ -93,6 +97,7 @@ Before any AI-generated output ships in either feature, it must satisfy:
 
 ## 9. Working process — standing rules
 
+- **Tooling** (source: `DECISIONS.md` D025, reconciled against the original pipeline's `ai_pipeline.html` tool-by-role inventory): kept and extended — Vitest, Playwright, Vercel/GitHub Actions. Dropped for this project — multi-model reconciliation (ChatGPT/Gemini comparison), Whimsical, v0, Jira/Atlassian Rovo; none serve a function this project's scope and scale actually needs (no open structural exploration, no multi-person coordination). Notion shifts to reference-only — no new pages authored here; new PM-lens decisions go into `DECISIONS.md` instead.
 - **Verify, don't assume, whenever a specific fact matters.** This project's own history has repeatedly found live sources disagreeing with cached ones (see §10) — treat any UI copy, field behavior, or figure as unconfirmed until checked against the live app or the most current fetched source, not the first document that surfaces it.
 - **Live source beats Notion/doc source when they conflict.** Track record on this project specifically: Notion and legacy `CLAUDE.md` files have drifted from shipped reality multiple times; the live app and current canonical HTML have not yet been found wrong.
 - **Pull design tokens individually, on demand, not wholesale.** Do not embed PDB 05's full token/typography table into this file preemptively — that reintroduces the fragmentation problem this file exists to avoid, at the cost of bloating the one document meant to stay fully readable every session.
@@ -106,3 +111,11 @@ Before any AI-generated output ships in either feature, it must satisfy:
 - `pd/CLAUDE.md`'s canonical sample dataset is stale relative to `dev/CLAUDE.md`'s corrected figures (dataset corrections were applied after PD phase concluded). Specific known deltas: portfolio total $849,851.40 (pd, stale) vs. $870,619.40 (dev, corrected); VTSAX ST gain $1,515.85 (pd, stale) vs. $1,515.50 (dev, corrected); EST. NET TAX $110.21 (pd, stale) vs. $111.21 (dev, corrected). **Always use `dev/CLAUDE.md`'s figures.**
 - Design-history chat threads (mid-project Figma/CC prompt sessions) contain superseded decisions — e.g., "Execute"/"Proceed" button terminology, an assumption that Scenario Analysis would "always be in edit mode." These did not ship; do not treat design-history excerpts as current unless cross-checked against a live source.
 - Minor/unconfirmed: the canonical workflow HTML's text description of the allocation-impact indicator ("Improved/Regressed/Neutral", categorical) does not match the live app's summary view, which shows signed per-asset-class percentage deltas. Doesn't affect either feature's scope; flagged for whoever eventually touches that indicator.
+
+## 11. Test-case coverage baseline (source: `DECISIONS.md` D032 — agreed prior to any UI build)
+
+These are the acceptance-criteria categories both features build toward, not a description of what's already implemented — check `DECISIONS.md` for build-status entries before assuming any of these are covered yet.
+
+**Narration (Feature 1) — 10 categories:** pure gain / pure loss-harvest / mixed gain+harvest / ST-LT crossing / Traditional IRA ordinary-income framing / allocation toward-target / allocation away-from-target / Wait & Save triggered / SpecID lot-level active / same figures across two segment tones / multi-fund (3+) aggregation.
+
+**What-if (Feature 2) — 9 categories:** clean unambiguous delta / vague-relative quantity requiring clarification / objective-shaped request mapping to Tax-first or Balance-first / full specification with explicit cost-basis methods / multi-turn with inline lot-level detail / SpecID requested on Traditional IRA (must refuse) / requested amount exceeding position size (must catch, not pass to engine) / ambiguous fund reference requiring disambiguation / out-of-scope general-advice request (must decline per assistive-not-directive posture).
