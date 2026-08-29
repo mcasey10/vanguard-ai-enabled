@@ -1,6 +1,6 @@
 /**
  * Narration input/output types and the pure logic shared between the
- * client (dev/src/utils/narration.ts) and the server (dev/src/server/narrationEngine.ts,
+ * client (dev/src/utils/narration.ts) and the server (dev/src/server/,
  * dev/api/narrate.ts). Nothing in this file touches the network or reads
  * an API key — see CLAUDE.md §7 for the CD-4.2 boundary this enforces.
  */

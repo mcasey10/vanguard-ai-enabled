@@ -1,14 +1,17 @@
 /**
  * Narration layer tests — dev/src/utils/narration.test.ts
  *
- * Covers all 11 categories in CLAUDE.md §11's "Narration (Feature 1)" list.
+ * Covers all 11 categories in CLAUDE.md §12's "Narration (Feature 1)" list.
  * Every fixture below uses real fund/lot/account values already present in
  * dev/src/data/sample-dataset.json (via loadPortfolio()/getMarketContextData())
  * rather than invented numbers — same rule this project has followed for
- * engine.test.ts. The live Anthropic call is mocked, never hit (CLAUDE.md §7).
+ * engine.test.ts. The live provider call is mocked, never hit (CLAUDE.md §7)
+ * — tests mock at the fetch/HTTP boundary (client → /api/narrate), which is
+ * inherently provider-agnostic (DECISIONS.md D042), not at any specific
+ * provider's SDK or endpoint.
  */
 
-import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { loadPortfolio, getMarketContextData } from '../data/loader'
 import {
   buildDeterministicFallback, isMarketContextExcluded, buildMarketContext,
@@ -173,7 +176,7 @@ describe('narration coverage categories (CLAUDE.md §11)', () => {
   // message) must be identical while the tone guidance (system message)
   // differs, proving segment affects only tone, never content.
   test('10. same figures across two segment tones', async () => {
-    const { buildNarrationPrompt } = await import('../server/narrationEngine')
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
     const lot = findLot('VTSAX', 'T-VTSAX-08')
     const fr = fundResult({ fund_id: 'VTSAX', fund_name: 'VTSAX Fund', sell_amount: lot.current_value, est_st_gain_loss: lot.unrealized_gain_loss })
     const inputA = buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' })
@@ -358,3 +361,63 @@ function makeScenario(alloc: {
     created_at: new Date().toISOString(),
   }
 }
+
+// ---------------------------------------------------------------------------
+// Provider-agnostic generator selection (CLAUDE.md §1, DECISIONS.md D042)
+// ---------------------------------------------------------------------------
+
+describe('narration generator selection (D042: provider-agnostic, Gemini default)', () => {
+  const ORIGINAL_ENV = process.env.NARRATION_PROVIDER
+
+  afterEach(() => {
+    if (ORIGINAL_ENV === undefined) delete process.env.NARRATION_PROVIDER
+    else process.env.NARRATION_PROVIDER = ORIGINAL_ENV
+  })
+
+  test('defaults to Gemini when NARRATION_PROVIDER is unset', async () => {
+    delete process.env.NARRATION_PROVIDER
+    const { getActiveGenerator } = await import('../server/narrationGenerator')
+    expect(getActiveGenerator().name).toBe('gemini')
+  })
+
+  test('NARRATION_PROVIDER=anthropic switches to the Anthropic adapter — no code change needed', async () => {
+    process.env.NARRATION_PROVIDER = 'anthropic'
+    const { getActiveGenerator } = await import('../server/narrationGenerator')
+    expect(getActiveGenerator().name).toBe('anthropic')
+  })
+
+  test('an unknown provider name throws NarrationApiError rather than silently falling back', async () => {
+    process.env.NARRATION_PROVIDER = 'not-a-real-provider'
+    const { getActiveGenerator, NarrationApiError } = await import('../server/narrationGenerator')
+    expect(() => getActiveGenerator()).toThrow(NarrationApiError)
+  })
+
+  test('both adapters implement the same NarrationGenerator interface shape', async () => {
+    const { anthropicGenerator } = await import('../server/generators/anthropicGenerator')
+    const { geminiGenerator } = await import('../server/generators/geminiGenerator')
+    for (const gen of [anthropicGenerator, geminiGenerator]) {
+      expect(typeof gen.name).toBe('string')
+      expect(typeof gen.generate).toBe('function')
+    }
+  })
+
+  test('both adapters fail the same way (NarrationApiError) with no key set — proves neither is coupled to a fallback path only the other knows about', async () => {
+    const { anthropicGenerator } = await import('../server/generators/anthropicGenerator')
+    const { geminiGenerator } = await import('../server/generators/geminiGenerator')
+    const { NarrationApiError } = await import('../server/narrationGenerator')
+    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY
+    const savedGeminiKey = process.env.GEMINI_API_KEY
+    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.GEMINI_API_KEY
+    try {
+      const lot = findLot('VTSAX', 'T-VTSAX-08')
+      const fr = fundResult({ fund_id: 'VTSAX', fund_name: 'VTSAX Fund', sell_amount: lot.current_value, est_st_gain_loss: lot.unrealized_gain_loss })
+      const input = buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+      await expect(anthropicGenerator.generate(input)).rejects.toBeInstanceOf(NarrationApiError)
+      await expect(geminiGenerator.generate(input)).rejects.toBeInstanceOf(NarrationApiError)
+    } finally {
+      if (savedAnthropicKey !== undefined) process.env.ANTHROPIC_API_KEY = savedAnthropicKey
+      if (savedGeminiKey !== undefined) process.env.GEMINI_API_KEY = savedGeminiKey
+    }
+  })
+})

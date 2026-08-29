@@ -3,11 +3,12 @@
  *
  * Minimal handler: validate the request body is shaped like a NarrationInput
  * (structured, already-engine-computed figures only — never raw account
- * data), call the Anthropic API, return prose text. Performs no calculation
- * of its own. See CLAUDE.md §7 and dev/src/server/narrationEngine.ts.
+ * data), call the active narration generator (provider-agnostic — see
+ * dev/src/server/narrationGenerator.ts), return prose text. Performs no
+ * calculation of its own. See CLAUDE.md §7.
  */
 
-import { generateNarration, NarrationApiError } from '../src/server/narrationEngine'
+import { getActiveGenerator, NarrationApiError } from '../src/server/narrationGenerator'
 import type { NarrationInput } from '../src/utils/narrationShared'
 
 interface VercelLikeRequest {
@@ -55,7 +56,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   }
 
   try {
-    const text = await generateNarration(req.body)
+    const text = await getActiveGenerator().generate(req.body)
     res.status(200).json({ text })
   } catch (err) {
     const message = err instanceof NarrationApiError ? err.message : 'Narration generation failed'

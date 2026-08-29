@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // Dev-server parity for dev/api/narrate.ts (Vercel serverless function) so
@@ -40,20 +40,36 @@ function narrateApiDevMiddleware(): Plugin {
   }
 }
 
-export default defineConfig({
-  plugins: [react(), narrateApiDevMiddleware()],
-  server: {
-    port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
-    strictPort: false,
-  },
-  test: {
-    environment: 'node',
-    globals: true,
-    // Scope Vitest to its own *.test.ts files under src/ — tests/ is
-    // Playwright's directory (tests/flows.spec.ts), a different test
-    // runner with an incompatible test.describe(). Vitest's default
-    // include pattern matches *.spec.ts too, which picks that file up
-    // and fails to parse it; this narrows discovery to avoid the collision.
-    include: ['src/**/*.test.ts'],
-  },
+export default defineConfig(({ mode }) => {
+  // Vite only auto-loads .env.local into import.meta.env (client bundles,
+  // VITE_-prefixed only) — it does NOT populate process.env for the Node
+  // process running the dev server. Our /api/narrate middleware runs
+  // server-side code that reads process.env.GEMINI_API_KEY /
+  // ANTHROPIC_API_KEY directly (same as it would under `vercel dev` or a
+  // real Vercel deployment, both of which DO inject env vars into
+  // process.env automatically) — load .env.local here explicitly so
+  // `npm run dev` alone keeps working without `vercel dev`, per D038/D039's
+  // local-dev-parity goal, now that D042 adds a second provider's key.
+  const env = loadEnv(mode, process.cwd(), '')
+  for (const key of ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'NARRATION_PROVIDER']) {
+    if (env[key] && !process.env[key]) process.env[key] = env[key]
+  }
+
+  return {
+    plugins: [react(), narrateApiDevMiddleware()],
+    server: {
+      port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
+      strictPort: false,
+    },
+    test: {
+      environment: 'node',
+      globals: true,
+      // Scope Vitest to its own *.test.ts files under src/ — tests/ is
+      // Playwright's directory (tests/flows.spec.ts), a different test
+      // runner with an incompatible test.describe(). Vitest's default
+      // include pattern matches *.spec.ts too, which picks that file up
+      // and fails to parse it; this narrows discovery to avoid the collision.
+      include: ['src/**/*.test.ts'],
+    },
+  }
 })

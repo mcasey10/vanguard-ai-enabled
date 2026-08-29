@@ -23,12 +23,12 @@ This project's own thesis, distinct from feature delivery: test whether role-bas
 
 **Rejected candidates** (see `DECISIONS.md` D004 for full reasoning): voice/chat-based Order Confirmation entry (wrong risk/value ratio at the highest-stakes, currently input-free stage); document ingestion for holdings extraction (violates bottom-up data construction, no UI precedent, high hallucination risk).
 
-**Standing principle — genuine generation, not simulation** (project-wide, governs both features, not just Feature 1 — see `DECISIONS.md` D038): All "AI-generated" or "AI-assisted" content in this application must be produced by an actual call to a language model at runtime — never templating, deterministic string assembly, or any other simulated mechanism, regardless of implementation convenience or infrastructure cost.
+**Standing principle — genuine generation, not simulation** (project-wide, governs both features, not just Feature 1 — see `DECISIONS.md` D038, D042): All "AI-generated" or "AI-assisted" content in this application must be produced by an actual call to a language model at runtime, via a swappable generator interface — never templating, deterministic string assembly, or any other simulated mechanism, regardless of implementation convenience or infrastructure cost. The provider behind that interface is changeable without redesigning calling code, tests, or the fallback logic — **the current active default provider is Gemini** (`gemini-2.5-flash-lite`, via Google AI Studio), with Anthropic (`claude-sonnet-5`) as a second, fully working adapter, switchable via the `NARRATION_PROVIDER` env var. D038 named Anthropic specifically before this generalization; D042 is the refinement, not a reversal of "real model call, never simulated."
 
 ## 2. Pointers (don't restate what's already true elsewhere — go look)
 
 - **This repo's calculation engine**: `dev/src/engine/` (module referenced independently of any screen — this is what makes both features architecturally viable: neither has to reimplement calculation logic, both call the same module Fund Selection already calls).
-- **This repo's narration engine**: `dev/api/narrate.ts` (Vercel serverless function, Anthropic API) plus its shared core logic and the client-side calling module — see §7 for the full contract. Narrative generation lives outside the calculation engine entirely, per CD-4.2 and the standing principle in §1.
+- **This repo's narration engine**: `dev/api/narrate.ts` (Vercel serverless function) calls a provider-agnostic `NarrationGenerator` interface (`dev/src/server/narrationGenerator.ts`), currently Gemini by default with Anthropic as a working alternative (`dev/src/server/generators/`) — see §7 for the full contract, §9 for exact file paths. Narrative generation lives outside the calculation engine entirely, per CD-4.2 and the standing principle in §1.
 - **Live previous-project application** — `https://vanguard-ai-pipeline-jade.vercel.app/` (reset via `?reset=true`). First-line source of truth for existing UI behavior and visual design. Check this and the design-system spec before consulting anything else, including this file's own notes, if there's any doubt about current behavior.
 - **Canonical workflow spec (HTML)** — `pm/sell_rebalance_workflow.html` in the previous project's repo (fetch live; do not trust a cached copy) — field-by-field states for all four stages, current as of v3.
 - **PRD 04** (Notion) — canonical user journey and segment definitions (Segments A–D). Superseded the old Workflow A/B step structure; use this, not `pm/CLAUDE.md`'s stale description.
@@ -89,12 +89,13 @@ Before any AI-generated output ships in either feature, it must satisfy:
 - Applies identically at all four touchpoints — one spec, four call sites, not four bespoke specs.
 - Disclosure per CD-1.2 required at each touchpoint (visually distinct from static/deterministic text) — **only when the content shown actually came from the model.** See fallback rule below for the case where it didn't.
 
-**Narration engine architecture** (see `DECISIONS.md` D038):
-- Generation is a real Anthropic API call at runtime, per §1's standing principle — not templating or deterministic assembly. Implemented as a minimal Vercel serverless function, `dev/api/narrate.ts`, wrapping shared core logic also used for local dev-server parity and for direct unit testing.
+**Narration engine architecture** (see `DECISIONS.md` D038, D042):
+- Generation is a real LLM API call at runtime, per §1's standing principle — not templating or deterministic assembly — made through a provider-agnostic `NarrationGenerator` interface so the active provider is swappable without touching the fallback logic, the caching layer, or any touchpoint call site. Implemented as a minimal Vercel serverless function, `dev/api/narrate.ts`, wrapping shared core logic also used for local dev-server parity and for direct unit testing.
+- **Provider-agnostic by design (D042)**: `getActiveGenerator()` selects Gemini (default) or Anthropic via `NARRATION_PROVIDER`. Both adapters build their prompt from the same shared, provider-agnostic prompt content (`dev/src/server/narrationPrompt.ts`) — no prompt text is duplicated per provider.
 - **Input/output contract is the CD-4.2 boundary made architectural, not just conventional**: the function receives only already-engine-computed structured figures (fund/lot identifiers, amounts, gain/loss figures, tax figures, allocation deltas, flags, and — when not excluded — the market-context figure). It never receives raw account data and never performs any calculation. It returns prose text only.
-- **Tests mock the API call.** Same precedent as the market-data rules below (no live network dependency in tests) — not a separate decision, the same one applied to a second live-data source.
+- **Tests mock at the interface/HTTP boundary, not any specific provider's SDK or endpoint.** Same precedent as the market-data rules below (no live network dependency in tests) — not a separate decision, the same one applied to every live-data source. This is also what makes the provider swap safe: client/caching tests mock `fetch` against `/api/narrate` (provider-agnostic already), and adapter-selection tests assert on `getActiveGenerator().name`, never on which HTTP call happened underneath.
 - **Failure fallback differs from the market-data sentence's rule on purpose.** Market context is supplementary — omitting it silently on failure is fine (rule 2 below). Narration is the *primary* content at all four touchpoints, so on API failure the touchpoint falls back to a plain, deterministic summary of the same structured figures rather than blank space. That fallback **must not** carry the CD-1.2 AI-generated badge — it genuinely isn't AI-generated in that state, so the badge stays honest in both the success and failure case rather than becoming a fixed label that's sometimes false.
-- **Caching**: narration is memoized client-side by a stable hash of the full input payload (touchpoint + structured figures, including market-context/exclusion state) for the session. Decided explicitly, not a silent default — see D038 for the reasoning.
+- **Caching**: narration is memoized client-side by a stable hash of the full input payload (touchpoint + structured figures, including market-context/exclusion state) for the session. Decided explicitly, not a silent default — see D038 for the reasoning. Cache keys don't include which provider generated the text — see D042 for why that's fine (the fallback/interface boundary the client depends on doesn't change across providers).
 - **Market-data rules** (governs the third narration input, live market-performance context — see `DECISIONS.md` D028–D031, D037):
   1. May state only a percentage return between two real dates — never an absolute price, real or fictional, in the same sentence or surrounding narration.
   2. The figure is a static, precomputed dataset value verified once at authoring time, never a live runtime fetch — no failure-handling or test-mocking logic is needed for it as a result.
@@ -122,13 +123,17 @@ Before any AI-generated output ships in either feature, it must satisfy:
 
 **Feature 1 — shared narration architecture (one spec, four call sites — see §7):**
 - Narration component (all four touchpoints render through this one): `dev/src/components/NarrationBlock.tsx`
-- Server-side engine (the Anthropic call): `dev/api/narrate.ts` (Vercel serverless function) + `dev/src/server/narrationEngine.ts` (shared core logic — prompt construction, the actual API call; server-only, never imported client-side)
+- Vercel serverless function (the HTTP entry point): `dev/api/narrate.ts` — calls `getActiveGenerator().generate(input)`, doesn't know which provider
+- Provider-agnostic generator interface + active-provider selection (`NARRATION_PROVIDER` env var, defaults to Gemini): `dev/src/server/narrationGenerator.ts`
+- Shared, provider-agnostic prompt construction (used by every adapter — no per-provider prompt duplication): `dev/src/server/narrationPrompt.ts`
+- Provider adapters, each a concrete `NarrationGenerator`: `dev/src/server/generators/geminiGenerator.ts` (active default, `gemini-2.5-flash-lite`), `dev/src/server/generators/anthropicGenerator.ts` (working alternative, `claude-sonnet-5`)
 - Client-side caching/fetch module: `dev/src/utils/narration.ts`
 - Deterministic fallback builder (used on API failure, never AI-badged): `buildDeterministicFallback()` in `dev/src/utils/narrationShared.ts`
 - Shared types + market-context exclusion check: `dev/src/utils/narrationShared.ts` (`NarrationInput`, `isMarketContextExcluded()`, `buildMarketContext()`)
 - Per-touchpoint input adapters (engine output → `NarrationInput`, no calculation): `dev/src/utils/narrationBuilders.ts`
-- Local dev-server parity for `/api/narrate` (so `npm run dev` alone works without `vercel dev`): middleware in `dev/vite.config.ts`
-- Test coverage for all 11 §12 categories: `dev/src/utils/narration.test.ts`
+- Local dev-server parity for `/api/narrate`, including loading `.env.local` into `process.env` for the dev Node process (so `npm run dev` alone works without `vercel dev`): middleware + `loadEnv()` wiring in `dev/vite.config.ts`
+- Env var scaffolding: `dev/.env.example` (committed, placeholders only), `dev/.env.local` (gitignored, real keys)
+- Test coverage for all 11 §12 categories, plus generator-selection/interface-boundary coverage: `dev/src/utils/narration.test.ts`
 
 **Feature 2 (what-if assistant):** not yet built — no files exist. Update this entry when it is.
 

@@ -1,22 +1,17 @@
 /**
- * Server-only narration engine — the Anthropic API call itself.
- *
- * SERVER-ONLY: reads process.env.ANTHROPIC_API_KEY. Never import this file
- * from client code (dev/src/**, excluding this directory) — only
- * dev/api/narrate.ts and the Vite dev-server middleware in vite.config.ts
- * should import it. Client code uses dev/src/utils/narration.ts, which
- * calls this over HTTP via /api/narrate.
+ * Provider-agnostic prompt content — the actual English instructions sent
+ * to whichever model is generating narration. Shared by every adapter in
+ * dev/src/server/generators/ so the prompt itself never has to be
+ * duplicated or drift between providers; each adapter only maps
+ * {system, user} into its own API's request shape.
  *
  * Input/output contract (CLAUDE.md §7 — the CD-4.2 boundary made
  * architectural): this module receives only already-engine-computed
- * NarrationInput figures and returns only prose text. It never receives
- * raw account/portfolio data and performs no calculation of its own.
+ * NarrationInput figures. It never receives raw account/portfolio data
+ * and performs no calculation of its own.
  */
 
 import type { NarrationInput } from '../utils/narrationShared'
-
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-5'
 
 const SEGMENT_TONE: Record<NarrationInput['segment'], string> = {
   A: 'Segment A prefers data over interpretation — stay terse and figure-forward. One to two short sentences, lead with the numbers, minimal editorializing.',
@@ -52,47 +47,4 @@ export function buildNarrationPrompt(input: NarrationInput): { system: string; u
   const user = JSON.stringify(figures, null, 2)
 
   return { system, user }
-}
-
-export class NarrationApiError extends Error {}
-
-/** Calls the Anthropic Messages API. Throws NarrationApiError on any failure — callers fall back to the deterministic summary (CLAUDE.md §7). */
-export async function generateNarration(input: NarrationInput): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new NarrationApiError('ANTHROPIC_API_KEY is not set')
-  }
-
-  const { system, user } = buildNarrationPrompt(input)
-
-  let res: Response
-  try {
-    res = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 300,
-        system,
-        messages: [{ role: 'user', content: user }],
-      }),
-    })
-  } catch (err) {
-    throw new NarrationApiError(`Anthropic API request failed: ${(err as Error).message}`)
-  }
-
-  if (!res.ok) {
-    throw new NarrationApiError(`Anthropic API returned ${res.status}`)
-  }
-
-  const body = await res.json() as { content?: Array<{ type: string; text?: string }> }
-  const text = body.content?.find(b => b.type === 'text')?.text
-  if (!text) {
-    throw new NarrationApiError('Anthropic API returned no text content')
-  }
-  return text.trim()
 }
