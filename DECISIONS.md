@@ -315,3 +315,37 @@ Addressed only after D044's figures were confirmed correct — fixing prompt wor
 **`docs/narration-review-sample.md` regenerated one final time** with both tiers' fixes applied together (real figures from D044 + improved prompt from D045) — all 13 real Gemini calls succeeded. Header note rewritten to describe both fixes and point to this entry.
 
 **Final baseline, both tiers complete**: Vitest 85/85, Playwright 2/2.
+
+### D046 — [Dev] Tier 1: MinTax's T-VTSAX-08 selection for the $5,000 Category-1 sale verified correct — minimizes total tax dollars, not rate
+Asked to verify, not assume, whether MinTax picking a short-term lot (`T-VTSAX-08`, gain $440.77, tax $105.78) over VTSAX's long-term lots (some dating to 2004) was correct algorithm behavior or a bug.
+
+**Read the actual logic first** (`selectLots()`, `dev/src/engine/index.ts`): MinTax sorts lots ascending by `(current_nav - cost_basis_per_share) / current_nav * taxRate(holding_period, accountType, rates)` — i.e., *embedded gain as a percentage of current value*, multiplied by the applicable rate for that holding period. This is a per-dollar-of-proceeds tax-cost ranking, not a rate-only ranking, and not a literal search over all lot combinations — it's a greedy fill from this ranking. Since a partial sale's cost/gain split is proportional to the lot's own total figures (`partialCost()`), this per-dollar ranking is invariant to sale size — meaning whichever lot ranks best here is the true minimum-tax choice for a same-size sale from any candidate lot, not just an approximation.
+
+**Verified against the real engine, not a manual estimate**: computed what a $5,000 sale from *each* of VTSAX's 9 real taxable lots would produce, using `runOptimization()` with `specific_lot_identification` targeting each lot in turn (real proportional cost split, real tax computation — the same code path Category 1 itself uses, just forced to each lot instead of letting MinTax pick).
+
+| Lot | Acquired | Period | Basis/sh | Gain % of NAV | Tax on $5,000 sale |
+|---|---|---|---|---|---|
+| T-VTSAX-08 | 2025-08-15 | ST | $132.40 | 8.82% | **$105.78** ← MinTax's pick, genuinely lowest |
+| T-VTSAX-09 | 2025-11-20 | ST | $130.53 | 10.10% | $121.24 |
+| T-VTSAX-07 | 2024-11-10 | LT | $117.37 | 19.17% | $143.75 |
+| T-VTSAX-06 | 2023-07-15 | LT | $110.20 | 24.10% | $180.78 |
+| T-VTSAX-05 | 2020-04-01 | LT | $72.50 | 50.07% | $375.52 |
+| T-VTSAX-04 | 2016-09-15 | LT | $62.30 | 57.09% | $428.20 |
+| T-VTSAX-03 | 2012-06-10 | LT | $45.80 | 68.46% | $513.43 |
+| T-VTSAX-01 | 2004-03-15 | LT | $35.20 | 75.76% | $568.18 |
+| T-VTSAX-02 | 2008-11-20 | LT | $25.40 | 82.51% | $618.80 |
+
+**Verdict: correct-but-counterintuitive, not a bug.** `T-VTSAX-08`'s small embedded gain (8.82% of current value, since it was bought recently near today's price) more than offsets its higher short-term rate (24% vs. 15% LT) — every long-term alternative has a large enough embedded gain percentage that its rate advantage doesn't close the gap. The next-closest ST lot (`T-VTSAX-09`) is $15.46 more in tax; every LT lot is at least $37.97 more, rising to $513 more for the oldest, lowest-cost-basis lots.
+
+**Documented in `CLAUDE.md` §5** (the MinTax business rule's new home in the Constraints section) specifically so this doesn't get re-flagged as a suspected bug by someone who hasn't seen this verification — states plainly that MinTax minimizes total dollars, not rate, with the mechanism and this session's concrete numbers as evidence.
+
+No code changed this entry — verification and documentation only.
+
+### D047 — [Dev] Tier 2: category 8's run-on sentence fixed with a structural (not length) rule in segment A's instruction
+Segment A's prior instruction ("write exactly ONE short sentence") was a length constraint that didn't scale — a four-fund automated recommendation (category 8) got forced into one long, comma-chained run-on sentence regardless of fund count.
+
+**Fixed in `dev/src/server/narrationPrompt.ts`**: segment A's rule now structures by fund count, not a fixed sentence limit — one short, figure-led sentence per fund for multi-fund transactions, explicitly forbidding chaining funds together with commas/"alongside"/"plus"/"and" into a single sentence. Includes a two-fund example showing two separate sentences, and states plainly: "A four-fund transaction gets four short sentences, not one sentence with four clauses."
+
+**Verified against regenerated real output**, category 8's exact fixture (automated, balance-first, $350,000): now renders as four separate sentences, one per fund (VTSAX, VTIAX, VBTLX, VBIRX), each independently scannable — confirmed by regenerating just this one category and counting sentence boundaries. `docs/narration-review-sample.md`'s category 8 section updated with the corrected sample and a note on the fix.
+
+**Baseline after tiers 1 and 2**: Vitest 85/85, Playwright 2/2.
