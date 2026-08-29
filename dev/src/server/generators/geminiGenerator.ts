@@ -5,14 +5,15 @@
  * new projects — verified live against ai.google.dev this session, not
  * assumed from training data).
  *
- * Model: gemini-2.5-flash-lite — the cheapest currently-GA Gemini tier
- * ($0.10/$0.40 per 1M input/output tokens as of this session's check),
- * chosen over the newer 3.x flash-lite generations specifically because
- * they cost more per token; this is a short-input/short-output generation
- * task with no need for a larger or newer tier (same reasoning as
- * Haiku-over-Opus for the Anthropic adapter). Verify this is still the
- * cheapest GA option if picking up this file much later — pricing tiers
- * and generations shift (see DECISIONS.md D042).
+ * Model: gemini-3.5-flash-lite. D042 originally picked gemini-2.5-flash-lite
+ * as the cheapest GA tier by listed price, but it turned out to be retired
+ * for new API keys — a real call against it returned 404 with
+ * "This model models/gemini-2.5-flash-lite is no longer available to new
+ * users. Please update your code to use models/gemini-3.5-flash-lite" (see
+ * DECISIONS.md D043). 3.5-flash-lite is confirmed working end-to-end with a
+ * real key as of this update. Verify this is still current if picking up
+ * this file much later — pricing tiers, generations, and availability
+ * shift (D042/D043).
  *
  * Reads process.env.GEMINI_API_KEY. Never imported from client code.
  */
@@ -22,7 +23,7 @@ import { NarrationApiError } from '../narrationGenerator'
 import { buildNarrationPrompt } from '../narrationPrompt'
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions'
-const MODEL = 'gemini-2.5-flash-lite'
+const MODEL = 'gemini-3.5-flash-lite'
 
 interface InteractionStep {
   type: string
