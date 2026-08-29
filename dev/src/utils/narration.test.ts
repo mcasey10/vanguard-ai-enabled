@@ -189,6 +189,100 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
     expect(text).toMatch(new RegExp(`${notice!.days_until_lt} more day`))
   })
 
+  // Multi-fund (3+) aggregation — closes the gap flagged in CLAUDE.md §12 / DECISIONS.md
+  // D048: this category was in D032's original plan but never had its own dedicated
+  // test. Reuses category 8's exact real fixture (automated, balance-first, $350,000 —
+  // a real 4-fund transaction: VTSAX, VTIAX, VBTLX, VBIRX) rather than building new
+  // fixture data, per instruction — it already exercises this case.
+  //
+  // Boundary note on what's asserted here vs. not: the *input* going into the prompt
+  // (all four funds' figures correctly separated, attributed, and aggregated) is
+  // fully deterministic real-engine output, so it's asserted directly and exactly.
+  // Whether the *live model's generated prose* actually renders as four separate
+  // sentences (D047's fix) is NOT re-asserted here with a live API call or an exact
+  // wording match — this suite has never made live provider calls (CLAUDE.md §7,
+  // D038 rule 4, D042: tests mock at the interface/HTTP boundary, no live network
+  // dependency), and prose wording can legitimately vary run to run even with the
+  // same instruction. That empirical check was already done manually against real
+  // Gemini output in D047 (docs/narration-review-sample.md's category 8). What IS
+  // asserted here, as the code-level guarantee that D047's fix actually applies to
+  // THIS multi-fund input, is that buildNarrationPrompt()'s system prompt for this
+  // fixture's segment contains the per-fund structural instruction verbatim.
+  describe('multi-fund (3+) aggregation', () => {
+    function fourFundResult() {
+      return automatedRun(TAXABLE, 350000, 'balance-first')
+    }
+
+    test('all 3+ funds are present with figures correctly attributed — no merging or cross-contamination', () => {
+      const rec = fourFundResult()
+      expect(rec.fund_results.length).toBeGreaterThanOrEqual(3) // sanity: this really is a 3+ fund fixture
+      const input = buildFundResultNarrationInput({
+        fundResults: rec.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'A',
+        est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+      })
+      expect(input.funds).toHaveLength(rec.fund_results.length)
+
+      // Every real fund's figures must land on that same fund in the narration
+      // input, unchanged — not merged into another fund's line, not summed
+      // together, not dropped.
+      for (const fr of rec.fund_results) {
+        const line = input.funds.find(f => f.fund_id === fr.fund_id)
+        expect(line, `narration input is missing fund ${fr.fund_id}`).toBeDefined()
+        expect(line!.st_gain_loss).toBe(fr.est_st_gain_loss)
+        expect(line!.lt_gain_loss).toBe(fr.est_lt_gain_loss)
+        expect(line!.est_tax_gross).toBe(fr.est_tax_gross)
+        expect(line!.impact_pct).toBe(fr.impact_pct)
+        expect(line!.accounting_method).toBe(fr.accounting_method)
+      }
+
+      // Cross-contamination check: no two funds should have been given each
+      // other's figures. Real fixture data happens to make every fund's
+      // st_gain_loss distinct, so exact-value collisions across funds would
+      // indicate a mix-up rather than coincidence.
+      const stGainValues = input.funds.map(f => f.st_gain_loss)
+      expect(new Set(stGainValues).size).toBe(stGainValues.length)
+    })
+
+    test('aggregate figures (net tax, effective rate, losses harvested) are computed across all funds, not just per-fund', () => {
+      const rec = fourFundResult()
+      const input = buildFundResultNarrationInput({
+        fundResults: rec.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'A',
+        est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+      })
+
+      // est_net_tax/effective_rate: real portfolio-level netted figures from the
+      // engine, not a naive sum of each fund's own est_tax_gross (which would
+      // double-count/miss the cross-fund netting the engine already did).
+      expect(input.est_net_tax).toBe(rec.est_net_tax)
+      expect(input.effective_rate).toBe(rec.effective_rate)
+      const sumOfPerFundTax = rec.fund_results.reduce((s, fr) => s + fr.est_tax_gross, 0)
+      expect(input.est_net_tax).not.toBe(sumOfPerFundTax) // sanity: netting actually changes the figure for this fixture
+
+      // losses_harvested: real sum of every fund's own net loss (funds with a
+      // net gain contribute 0, not a negative offset) — computed independently
+      // here from the same real per-fund figures the input was built from, not
+      // copied from the builder's own logic.
+      const expectedLossesHarvested = rec.fund_results.reduce((s, fr) => s + Math.min(0, fr.est_st_gain_loss + fr.est_lt_gain_loss), 0)
+      expect(input.losses_harvested).toBeCloseTo(expectedLossesHarvested, 2)
+      expect(rec.fund_results.some(fr => fr.est_st_gain_loss + fr.est_lt_gain_loss < 0)).toBe(true) // sanity: at least one real fund contributes a loss in this fixture
+    })
+
+    test('the per-fund structural instruction (D047) is present in the prompt for this multi-fund input', async () => {
+      const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+      const rec = fourFundResult()
+      const input = buildFundResultNarrationInput({
+        fundResults: rec.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'A',
+        est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+      })
+      const { system } = buildNarrationPrompt(input)
+      expect(system).toMatch(/ONE short sentence PER FUND/)
+      expect(system).toMatch(/A four-fund transaction gets four short sentences/)
+      // Real generated output for this exact fixture already confirmed to
+      // actually render as four separate sentences — see D047 /
+      // docs/narration-review-sample.md category 8.
+    })
+  })
+
   // 9. SpecID lot-level active — ROTH-VFIAX-07, real engine call, specific_lot_identification
   test('9. SpecID lot-level active', () => {
     const fr = realFundResultForLot(ROTH_IRA, 'VFIAX', 'ROTH-VFIAX-07')
