@@ -30,6 +30,7 @@ import {
 } from './narrationBuilders'
 import { runOptimization, type ManualSelections } from '../engine/index'
 import { buildScenarioFromFundResults } from './scenarioBuilder'
+import { taxFigureToNumber } from './format'
 import type { FundSaleResult, ManualConfiguration, Recommendation } from '../types'
 
 const portfolio = loadPortfolio()
@@ -148,7 +149,7 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
   // better — that combination is deliberately not used here.
   test('6. allocation toward-target', () => {
     const config = manualRun(TAXABLE, 30000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 30000 }] })
-    const scenario = buildScenarioFromFundResults(config.fund_results, portfolio, TAX_RATES, config.allocation_impact)
+    const scenario = buildScenarioFromFundResults(config.fund_results, portfolio, TAX_RATES, config.allocation_impact, TAXABLE)
     expect(scenario).not.toBeNull()
     const input = buildScenarioNarrationInput({ scenario: scenario!, portfolio, accountType: 'taxable_brokerage', segment: 'A' })
     const before = distanceFromTarget(input.allocation_impact!.before)
@@ -163,7 +164,7 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
   // away from target (distance-to-target sum increases).
   test('7. allocation away-from-target', () => {
     const config = manualRun(TAXABLE, 20000, { fund_selections: [{ fund_id: 'VBTLX', accounting_method: 'MinTax', sell_amount: 20000 }] })
-    const scenario = buildScenarioFromFundResults(config.fund_results, portfolio, TAX_RATES, config.allocation_impact)
+    const scenario = buildScenarioFromFundResults(config.fund_results, portfolio, TAX_RATES, config.allocation_impact, TAXABLE)
     expect(scenario).not.toBeNull()
     const input = buildScenarioNarrationInput({ scenario: scenario!, portfolio, accountType: 'taxable_brokerage', segment: 'A' })
     const before = distanceFromTarget(input.allocation_impact!.before)
@@ -255,7 +256,7 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
       // double-count/miss the cross-fund netting the engine already did).
       expect(input.est_net_tax).toBe(rec.est_net_tax)
       expect(input.effective_rate).toBe(rec.effective_rate)
-      const sumOfPerFundTax = rec.fund_results.reduce((s, fr) => s + fr.est_tax_gross, 0)
+      const sumOfPerFundTax = rec.fund_results.reduce((s, fr) => s + taxFigureToNumber(fr.est_tax_gross), 0)
       expect(input.est_net_tax).not.toBe(sumOfPerFundTax) // sanity: netting actually changes the figure for this fixture
 
       // losses_harvested: real sum of every fund's own net loss (funds with a
@@ -309,6 +310,110 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
     expect(promptA.system).not.toBe(promptB.system) // different tone guidance
   })
 
+  // D074 — closes the D069-flagged gap: Segments C and D had never been
+  // exercised by this suite at all, which is exactly how the cross-wired
+  // content went unnoticed. Same figures-vs-tone split as category 10,
+  // extended to all four segments, plus content assertions tying each
+  // segment's real tone directly back to segmentResearch.ts's own exported
+  // fields — the actual shared source this prompt now reads from, not just
+  // a paraphrase that happens to currently agree with it.
+  test('D074: all four segments produce identical figures but four genuinely distinct tone instructions', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const base = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+    const prompts = (['A', 'B', 'C', 'D'] as const).map(segment => buildNarrationPrompt({ ...base, segment }))
+    expect(new Set(prompts.map(p => p.user)).size).toBe(1)
+    expect(new Set(prompts.map(p => p.system)).size).toBe(4)
+  })
+
+  test('D074: Segment C tone instructs the shortest possible phrasing and is built from segmentResearch.ts\'s own real quoted goal, not a re-typed copy', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const { SEGMENT_PROFILES } = await import('./segmentResearch')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const input = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'C' })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/shortest possible phrasing/i)
+    expect(system).toContain(SEGMENT_PROFILES.C.goal) // the literal shared string, not a paraphrase
+    expect(system).toContain(SEGMENT_PROFILES.C.toolMustAvoid)
+  })
+
+  // DECISIONS.md's Segment C content-rules entry: a style-only "be terse"
+  // instruction was not enough on its own — real generated output was
+  // technically shorter than Segment D's but still included the ST/LT
+  // breakdown and all four per-asset allocation percentages, exactly the
+  // "tax detail"/"optional extra work" this segment's own research says to
+  // avoid. Two explicit content rules replace the style-only guidance.
+  test('Segment C prompt states two explicit content rules — never a separate ST/LT breakdown, never per-asset allocation percentages', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const input = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'C' })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/never state the short-term and long-term gain\/loss breakdown separately/i)
+    expect(system).toMatch(/state only the single net tax figure/i)
+    expect(system).toMatch(/never state per-asset-class allocation percentage shifts/i)
+  })
+
+  test('D074: Segment D tone instructs plain-language jargon definitions and is built from segmentResearch.ts\'s own real quoted goal, not a re-typed copy', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const { SEGMENT_PROFILES } = await import('./segmentResearch')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const input = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'D' })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/plain[- ]language/i)
+    expect(system).toMatch(/cost basis/i) // the real worked example
+    expect(system).toContain(SEGMENT_PROFILES.D.goal) // the literal shared string, not a paraphrase
+  })
+
+  // Real generated output (read cold, cc-prompt-fix-segment-d-consistency.md)
+  // showed Segment D's orientation-before-specifics rule was being honored
+  // inconsistently: correct at Scenario Analysis/Order Confirmation, absent
+  // at Fund Selection's per-fund rows and at Execution Summary (the latter
+  // never previously checked). SEGMENT_TONE.D is one shared instruction
+  // (not duplicated per touchpoint — confirmed by inspecting
+  // narrationPrompt.ts directly), so the fix tightens that one shared string
+  // rather than reconciling drifted copies. It also finally references
+  // SEGMENT_PROFILES.D.toolMust ("Orientation before action...") — a real
+  // research field that existed all along but was never actually
+  // interpolated into the prompt, only .goal and .toolMustAvoid were.
+  test('Segment D prompt explicitly requires orientation before any specific fund/dollar figure, identically across a per-fund (Fund Selection) input and a past-tense (Execution Summary) input', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const { SEGMENT_PROFILES } = await import('./segmentResearch')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const perFundInput = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'D' })
+    const pastTenseInput: NarrationInput = { ...perFundInput, touchpoint: 'execution_summary_narrative', tense: 'past' }
+    for (const input of [perFundInput, pastTenseInput]) {
+      const { system } = buildNarrationPrompt(input)
+      expect(system).toContain(SEGMENT_PROFILES.D.toolMust) // "Orientation before action..." — real research, now actually used
+      expect(system).toMatch(/FIRST sentence must orient the reader/i)
+      expect(system).toMatch(/never open with "Selling \$X.*or "Sold \$X.*regardless of tense/i)
+    }
+  })
+
+  // D112's own fix (the orientation rule above) was itself re-checked with
+  // real output — read cold, cc-prompt-verify-segment-d-variation.md — across
+  // three genuinely different transactions (single-fund, a different fund
+  // pairing, different dollar amounts, funds never used in D112's own
+  // fixture). Structurally correct (every real output still oriented before
+  // stating specifics) but nearly every prospective-tense opening was a
+  // close paraphrase of the SAME single example sentence D112 had added —
+  // the model was echoing the example's specific wording, not just its
+  // pattern. Fixed by replacing the one canonical example per tense with two
+  // deliberately differently-worded ones, explicitly labeled as illustrative
+  // rather than a template, plus an explicit instruction to vary wording
+  // rather than default to a fixed opening phrase.
+  test('Segment D prompt instructs varied wording for the orienting sentence rather than a single fixed example to echo', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const input = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'D' })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/vary the wording/i)
+    expect(system).toMatch(/not a template to copy verbatim/i)
+    // Two distinct example openings per tense, not one — the D112-era single
+    // canonical sentence ("You're looking at a plan to sell part of two of
+    // your investments to raise cash") is gone entirely, not just relabeled.
+    expect(system).not.toContain("You're looking at a plan to sell part of two of your investments to raise cash")
+  })
+
   // 11. Market-context exclusion-check mechanism — tests the mechanism
   // itself (does the code consult market_context_exclusions), not just that
   // the one hardcoded VFITX case happens to render correctly.
@@ -353,6 +458,199 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
       const text = buildDeterministicFallback(input)
       expect(text).toMatch(/trailing 12 months/)
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 13/14. Traditional IRA real ordinary-income tax figure + early-withdrawal-
+// penalty omission (DECISIONS.md's IRA narration entry). Real automated
+// engine call against ACCT-TRAD-IRA-001 — est_net_tax is now a real,
+// correctly-computed number (D083/D084), not the pre-D083 always-$0 figure
+// category 5's own fixture predates.
+// ---------------------------------------------------------------------------
+
+describe('13. Traditional IRA with a real computed ordinary income tax figure', () => {
+  const rec = automatedRun(TRAD_IRA, 10000)
+
+  test('sanity: this fixture genuinely has a real, nonzero ordinary income tax — $10,000 × 24% = $2,400', () => {
+    expect(rec.est_net_tax).toBeCloseTo(2400, 2)
+  })
+
+  test('the narration input actually carries the real figure through, not the pre-D083 $0', () => {
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+    })
+    expect(input.est_net_tax).toBeCloseTo(2400, 2)
+  })
+
+  test('the deterministic fallback states both the qualitative rule AND the real dollar figure', () => {
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+    })
+    const text = buildDeterministicFallback(input)
+    expect(text).toMatch(/ordinary income/i)
+    expect(text).toMatch(/\$2,400\.00/)
+  })
+
+  test('the prompt instructs the model to state the actual dollar tax figure, not just the qualitative rule alone', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+    })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/est_net_tax/)
+    expect(system).toMatch(/actual dollar tax figure/i)
+  })
+})
+
+describe('14. Traditional IRA narration correctly omits the early withdrawal penalty when not applicable', () => {
+  const rec = automatedRun(TRAD_IRA, 10000)
+
+  test('a real engine Recommendation genuinely carries the not_applicable sentinel, not a number', () => {
+    expect(rec.est_early_withdrawal_penalty).toBe('not_applicable')
+  })
+
+  test('the narration input omits the field entirely (undefined) rather than passing the sentinel through', () => {
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+      est_early_withdrawal_penalty: rec.est_early_withdrawal_penalty,
+    })
+    expect(input.est_early_withdrawal_penalty).toBeUndefined()
+  })
+
+  test('a genuine $0 penalty is also omitted, not stated as "$0.00" — only a real nonzero figure is ever included', () => {
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_early_withdrawal_penalty: 0,
+    })
+    expect(input.est_early_withdrawal_penalty).toBeUndefined()
+  })
+
+  test('a real, nonzero penalty (hypothetical future case) DOES flow through and get stated', () => {
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_early_withdrawal_penalty: 500,
+    })
+    expect(input.est_early_withdrawal_penalty).toBe(500)
+    const text = buildDeterministicFallback(input)
+    expect(text).toMatch(/\$500\.00/)
+    expect(text).toMatch(/penalty/i)
+  })
+
+  test('the deterministic fallback never mentions a penalty, age, or retirement when the figure is absent — no reassuring filler', () => {
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+      est_early_withdrawal_penalty: rec.est_early_withdrawal_penalty,
+    })
+    const text = buildDeterministicFallback(input)
+    expect(text).not.toMatch(/penalty/i)
+    expect(text).not.toMatch(/59/)
+    expect(text).not.toMatch(/retire/i)
+  })
+
+  test('self-audit guard: the not_applicable sentinel never leaks as literal text, and never produces NaN/undefined in output', () => {
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+      est_early_withdrawal_penalty: 'not_applicable',
+    })
+    const text = buildDeterministicFallback(input)
+    expect(text).not.toMatch(/not_applicable/i)
+    expect(text).not.toMatch(/NaN/)
+    expect(text).not.toMatch(/undefined/)
+  })
+
+  test('the prompt explicitly instructs omission by absence, not a stated non-applicability', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'traditional_IRA', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+    })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/est_early_withdrawal_penalty/)
+    expect(system).toMatch(/say NOTHING about penalties/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tense regression guard (DECISIONS.md D062): Fund Selection and Scenario
+// Analysis narrate a proposed, unexecuted plan — narrationPrompt.ts used to
+// receive input.tense but silently discard it, so the model had no signal
+// to avoid declarative past tense ("Sold $X...") for a sale that hasn't
+// happened. Order Confirmation is prospective too (same reasoning — nothing
+// has executed at that screen either); only Execution Summary is genuinely
+// past tense.
+// ---------------------------------------------------------------------------
+
+describe('narration tense per touchpoint (DECISIONS.md D062)', () => {
+  const fr = realFundResultForLot(TAXABLE, 'VTSAX', 'T-VTSAX-08')
+
+  test('fund_selection_rationale is prospective, not past', () => {
+    const input = buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+    expect(input.tense).toBe('prospective')
+  })
+
+  test('scenario_tradeoff_summary is prospective, not past', () => {
+    const scenario = buildScenarioFromFundResults([fr], portfolio, TAX_RATES, automatedRun(TAXABLE, fr.sell_amount).allocation_impact, TAXABLE)!
+    const input = buildScenarioNarrationInput({ scenario, portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+    expect(input.tense).toBe('prospective')
+  })
+
+  test('order_confirmation_summary is prospective, not past — nothing has executed at this screen either', async () => {
+    const { buildOrderConfirmationNarrationInput } = await import('./narrationBuilders')
+    const rec = automatedRun(TAXABLE, 10000)
+    const input = buildOrderConfirmationNarrationInput({
+      source: { kind: 'recommendation', data: rec }, portfolio, accountType: 'taxable_brokerage', segment: 'A',
+    })
+    expect(input.tense).toBe('prospective')
+  })
+
+  test('execution_summary_narrative is past — this one has actually executed', async () => {
+    const { buildExecutionSummaryNarrationInput } = await import('./narrationBuilders')
+    const config = manualRun(TAXABLE, fr.sell_amount, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: fr.sell_amount }] })
+    const transaction = {
+      transaction_id: 'txn-test', account_id: TAXABLE, account_type: 'taxable_brokerage' as const,
+      funds_sold: config.fund_results.map(r => ({ fund_id: r.fund_id, sell_amount: r.sell_amount, accounting_method: r.accounting_method, st_gain_loss: r.est_st_gain_loss, lt_gain_loss: r.est_lt_gain_loss, lots_sold: r.lots_sold })),
+      est_tax_at_active_rate: 0, effective_rate: 0, losses_harvested: 0,
+      stocks_before_pct: 0, stocks_after_pct: 0, bonds_before_pct: 0, bonds_after_pct: 0, reserves_before_pct: 0, reserves_after_pct: 0,
+      settlement_account_id: TAXABLE, submitted_at: new Date().toISOString(),
+    } as unknown as Parameters<typeof buildExecutionSummaryNarrationInput>[0]['transaction']
+    const input = buildExecutionSummaryNarrationInput({ transaction, portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+    expect(input.tense).toBe('past')
+  })
+
+  test('the prospective instruction reaches the actual prompt sent to the model — not just the input object', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const input = buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/has NOT been executed/)
+    expect(system).not.toMatch(/has already been executed and settled/)
+  })
+
+  test('the past-tense instruction reaches the prompt for execution_summary_narrative', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const input: NarrationInput = { ...buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' }), touchpoint: 'execution_summary_narrative', tense: 'past' }
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/has already been executed and settled/)
+    expect(system).not.toMatch(/has NOT been executed/)
+  })
+
+  test('the deterministic fallback (used on API failure) also respects tense — prospective input never says "Sold"', () => {
+    const prospectiveInput = buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+    const text = buildDeterministicFallback(prospectiveInput)
+    expect(text).not.toMatch(/^Sold /)
+    expect(text).not.toMatch(/ Sold /)
+  })
+
+  test('the deterministic fallback for a past-tense (Execution Summary) input does say "Sold"', () => {
+    const pastInput: NarrationInput = { ...buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' }), touchpoint: 'execution_summary_narrative', tense: 'past' }
+    const text = buildDeterministicFallback(pastInput)
+    expect(text).toMatch(/^Sold /)
   })
 })
 
@@ -473,37 +771,65 @@ describe('narration generator selection (D042: provider-agnostic, Gemini default
     expect(getActiveGenerator().name).toBe('anthropic')
   })
 
+  test('NARRATION_PROVIDER=groq switches to the Groq adapter (D065) — no code change needed', async () => {
+    process.env.NARRATION_PROVIDER = 'groq'
+    const { getActiveGenerator } = await import('../server/narrationGenerator')
+    expect(getActiveGenerator().name).toBe('groq')
+  })
+
   test('an unknown provider name throws NarrationApiError rather than silently falling back', async () => {
     process.env.NARRATION_PROVIDER = 'not-a-real-provider'
     const { getActiveGenerator, NarrationApiError } = await import('../server/narrationGenerator')
     expect(() => getActiveGenerator()).toThrow(NarrationApiError)
   })
 
-  test('both adapters implement the same NarrationGenerator interface shape', async () => {
+  // D071 — the Demo Settings dialog's runtime per-request override. The env
+  // var stays the default for headless testing and any request that omits
+  // an override; a real override always wins when present.
+  test('a per-request override wins over NARRATION_PROVIDER when both are present', async () => {
+    process.env.NARRATION_PROVIDER = 'groq'
+    const { getActiveGenerator } = await import('../server/narrationGenerator')
+    expect(getActiveGenerator('anthropic').name).toBe('anthropic')
+  })
+
+  test('omitting the override falls back to NARRATION_PROVIDER, unchanged from before this parameter existed', async () => {
+    process.env.NARRATION_PROVIDER = 'groq'
+    const { getActiveGenerator } = await import('../server/narrationGenerator')
+    expect(getActiveGenerator().name).toBe('groq')
+    expect(getActiveGenerator(undefined).name).toBe('groq')
+  })
+
+  test('all three adapters implement the same NarrationGenerator interface shape', async () => {
     const { anthropicGenerator } = await import('../server/generators/anthropicGenerator')
     const { geminiGenerator } = await import('../server/generators/geminiGenerator')
-    for (const gen of [anthropicGenerator, geminiGenerator]) {
+    const { groqGenerator } = await import('../server/generators/groqGenerator')
+    for (const gen of [anthropicGenerator, geminiGenerator, groqGenerator]) {
       expect(typeof gen.name).toBe('string')
       expect(typeof gen.generate).toBe('function')
     }
   })
 
-  test('both adapters fail the same way (NarrationApiError) with no key set — proves neither is coupled to a fallback path only the other knows about', async () => {
+  test('all three adapters fail the same way (NarrationApiError) with no key set — proves none is coupled to a fallback path only the others know about', async () => {
     const { anthropicGenerator } = await import('../server/generators/anthropicGenerator')
     const { geminiGenerator } = await import('../server/generators/geminiGenerator')
+    const { groqGenerator } = await import('../server/generators/groqGenerator')
     const { NarrationApiError } = await import('../server/narrationGenerator')
     const savedAnthropicKey = process.env.ANTHROPIC_API_KEY
     const savedGeminiKey = process.env.GEMINI_API_KEY
+    const savedGroqKey = process.env.GROQ_API_KEY
     delete process.env.ANTHROPIC_API_KEY
     delete process.env.GEMINI_API_KEY
+    delete process.env.GROQ_API_KEY
     try {
       const fr = realFundResultForLot(TAXABLE, 'VTSAX', 'T-VTSAX-08')
       const input = buildFundResultNarrationInput({ fundResults: [fr], portfolio, accountType: 'taxable_brokerage', segment: 'A' })
       await expect(anthropicGenerator.generate(input)).rejects.toBeInstanceOf(NarrationApiError)
       await expect(geminiGenerator.generate(input)).rejects.toBeInstanceOf(NarrationApiError)
+      await expect(groqGenerator.generate(input)).rejects.toBeInstanceOf(NarrationApiError)
     } finally {
       if (savedAnthropicKey !== undefined) process.env.ANTHROPIC_API_KEY = savedAnthropicKey
       if (savedGeminiKey !== undefined) process.env.GEMINI_API_KEY = savedGeminiKey
+      if (savedGroqKey !== undefined) process.env.GROQ_API_KEY = savedGroqKey
     }
   })
 })

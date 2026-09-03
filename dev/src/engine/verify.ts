@@ -19,6 +19,7 @@ import { fileURLToPath } from 'url'
 import { runOptimization, KNOWN_ROUNDING_ARTIFACTS } from './index.js'
 import type { Portfolio, Lot } from '../types/index.js'
 import type { OptimizationParams } from './index.js'
+import { taxFigureToNumber } from '../utils/format.js'
 
 // ---------------------------------------------------------------------------
 // Load canonical dataset (ESM-compatible path resolution)
@@ -113,7 +114,7 @@ caseHeader(1, 'Baseline — automated MinTax $25,000 from taxable')
     const hasVBTLX = rec.fund_results.some(f => f.fund_id === 'VBTLX')
     assert('VBTLX loss harvested', hasVBTLX, true)
     // Loss harvesting should reduce net tax below gross
-    const grossTax = rec.fund_results.reduce((s, f) => s + f.est_tax_gross, 0)
+    const grossTax = rec.fund_results.reduce((s, f) => s + taxFigureToNumber(f.est_tax_gross), 0)
     assert('net_tax ≤ gross_tax (losses offset)', rec.est_net_tax <= grossTax + EPSILON, true)
     section('Allocation impact')
     assert('allocation_impact populated', rec.allocation_impact !== null, true)

@@ -70,6 +70,18 @@ export interface NarrationInput {
   est_net_tax?: number
   effective_rate?: number
   losses_harvested?: number
+  /**
+   * Only ever populated with a real, nonzero figure — never the
+   * 'not_applicable' sentinel, and never a genuine $0. Both of those cases
+   * are coerced to `undefined` at the narrationBuilders.ts boundary before
+   * they ever reach this type, so `undefined` here means exactly one thing
+   * to every consumer (the prompt, the deterministic fallback): don't
+   * mention a penalty at all. This is a deliberate design choice (omit by
+   * default, state only when real), not a narrower version of the
+   * TaxFigureOrNA type that happened to lose the sentinel — see
+   * DECISIONS.md's IRA narration entry.
+   */
+  est_early_withdrawal_penalty?: number
   allocation_impact?: NarrationAllocationImpact
   wait_and_save_notices?: NarrationWaitAndSaveLine[]
 }
@@ -162,6 +174,13 @@ export function buildDeterministicFallback(input: NarrationInput): string {
 
   if (input.est_net_tax !== undefined) {
     text += ` Estimated net tax across this transaction: ${fmtMoney(input.est_net_tax)}.`
+  }
+  // Only ever present when real and nonzero (see NarrationInput's own doc
+  // comment) — omitted entirely otherwise, matching the AI prompt's
+  // identical instruction, so the fallback and the live model never
+  // disagree on when this gets mentioned.
+  if (input.est_early_withdrawal_penalty !== undefined) {
+    text += ` Estimated early withdrawal penalty: ${fmtMoney(input.est_early_withdrawal_penalty)}.`
   }
   if (input.wait_and_save_notices && input.wait_and_save_notices.length > 0) {
     const n = input.wait_and_save_notices[0]

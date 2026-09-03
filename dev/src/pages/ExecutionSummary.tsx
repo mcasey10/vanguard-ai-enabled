@@ -11,9 +11,15 @@ import { CoachMark } from '../components/CoachMark'
 import { useAppStore } from '../store/useAppStore'
 import { getTransactionHistory } from '../data/loader'
 import type { TransactionRecord } from '../types'
-import { formatCurrency, formatPercent } from '../utils/format'
+import { formatCurrency, formatPercent, accountTypeLabel } from '../utils/format'
 import { NarrationBlock } from '../components/NarrationBlock'
 import { buildExecutionSummaryNarrationInput } from '../utils/narrationBuilders'
+import { ExpandableDetail } from '../components/ExpandableDetail'
+import { TaxBreakdownPanel } from '../components/TaxBreakdownPanel'
+import {
+  bannerShowSeparateGainLoss, CONSOLIDATED_GAIN_LOSS_LABEL_TITLECASE, bannerRelabelForIra,
+  bannerShowEarlyWithdrawalPenalty, bannerShowYtdRealized, EARLY_WITHDRAWAL_PENALTY_NOTE,
+} from '../utils/accountBanner'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -21,9 +27,6 @@ import { buildExecutionSummaryNarrationInput } from '../utils/narrationBuilders'
 
 function r2(n: number) { return Math.round(n * 100) / 100 }
 
-function fmtRate2(n: number): string {
-  return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + '%'
-}
 
 function signed(n: number): string {
   if (n === 0) return formatCurrency(0)
@@ -98,7 +101,7 @@ function TimelineStep({ step, label, description, done, lastStep }: {
 
 export default function ExecutionSummary() {
   const navigate = useNavigate()
-  const { portfolio, resetSession } = useAppStore()
+  const { portfolio, resetSession, demoSettings } = useAppStore()
 
   // Get the most recently committed transaction from localStorage
   const history = getTransactionHistory()
@@ -111,7 +114,6 @@ export default function ExecutionSummary() {
   const netTaxableGain  = r2(txn?.net_taxable_gain ?? (stGains + ltGains + lossesHarvested))
   const estTotalTax     = r2(txn?.est_tax_at_active_rate ?? 0)
   const totalSaleAmount = r2(txn?.target_sale_amount ?? 0)
-  const effectiveRate   = txn?.effective_rate != null ? txn.effective_rate : (totalSaleAmount > 0 ? r2((estTotalTax / totalSaleAmount) * 100) : 0)
 
   // Cumulative YTD after transaction
   const cumulativeYtdST = r2(txn?.cumulative_ytd_st_gains ?? 0)
@@ -141,9 +143,24 @@ export default function ExecutionSummary() {
   const confirmationId = txn?.transaction_id ?? 'VSR-2026-48291'
   const taxYear = new Date().getFullYear()
 
-  // Account masked number
-  const acct = portfolio.accounts.find(a => a.account_type === 'taxable_brokerage')
+  // Account masked number — the account this transaction actually settled
+  // into (D057: was hardcoded to Taxable Brokerage regardless of which
+  // account the sale was against, showing the wrong masked number for an
+  // IRA/Roth transaction).
+  const acct = portfolio.accounts.find(a => a.account_id === txn?.account_id)
+    ?? portfolio.accounts.find(a => a.account_type === 'taxable_brokerage')
   const masked = acct?.masked_number ?? '...4782'
+  // The real account name/type — this page previously stated no account
+  // context anywhere at all, and its one settlement-destination mention
+  // hardcoded the literal word "Brokerage" regardless of the real account
+  // type (the same bug OrderConfirmation.tsx's DESTINATION field had),
+  // actively misleading for a Traditional IRA or Roth IRA transaction.
+  const accountName = accountTypeLabel(acct?.account_type)
+
+  // IRA banner redesign — display/layout only, see accountBanner.ts.
+  const showSeparateGainLoss = bannerShowSeparateGainLoss(acct?.account_type)
+  const showYtd = bannerShowYtdRealized(acct?.account_type)
+  const showPenalty = bannerShowEarlyWithdrawalPenalty(acct?.account_type)
 
   function handleStartNewSale() {
     resetSession()
@@ -167,7 +184,7 @@ export default function ExecutionSummary() {
               Your sell order has been placed and is being processed. Confirmation #{confirmationId}
             </p>
             <p className="text-[12px] text-[#717777] w-full leading-[15px]">
-              Estimated settlement: 1–2 business days · Proceeds to Brokerage {masked} settlement fund
+              Estimated settlement: 1–2 business days · Proceeds to {accountName} {masked} settlement fund
             </p>
           </div>
         </div>
@@ -177,13 +194,15 @@ export default function ExecutionSummary() {
           <div className="bg-white border border-[#e8e9e9] rounded-[8px] p-[16px] w-full">
             <NarrationBlock
               textClassName="text-[13px] text-[#040505] leading-normal"
+              provider={demoSettings.narrationProvider ?? undefined}
               input={buildExecutionSummaryNarrationInput({
                 transaction: txn,
                 portfolio,
-                // TransactionRecord doesn't track account_type; every
-                // transaction in this build is against the taxable account.
-                accountType: 'taxable_brokerage',
-                segment: 'A',
+                // TransactionRecord.account_type is set at submission time as
+                // of D057 (account switching); falls back to taxable only for
+                // a transaction recorded before that field existed.
+                accountType: txn.account_type ?? 'taxable_brokerage',
+                segment: demoSettings.narrationSegment,
               })}
             />
           </div>
@@ -217,9 +236,14 @@ export default function ExecutionSummary() {
           const totalSell = r2(txn.funds_sold.reduce((s, f) => s + f.sell_amount, 0))
           return (
             <div className="bg-white border border-[#e8e9e9] flex flex-col items-start rounded-[8px] overflow-clip w-full">
-              {/* Card Header */}
-              <div className="bg-[#f8f8f8] border-b border-[#e8e9e9] flex items-center h-[48px] px-[15px] w-full">
+              {/* Card Header — account name/masked number added so this
+                  receipt actually states which account the transaction was
+                  for (previously the only account mention on this whole page
+                  was the success banner's settlement line, which hardcoded
+                  "Brokerage" regardless of the real account type). */}
+              <div className="bg-[#f8f8f8] border-b border-[#e8e9e9] flex items-center justify-between h-[48px] px-[15px] w-full">
                 <span className="text-[13px] font-semibold text-[#040505]">Transaction summary</span>
+                <span className="text-[12px] font-semibold text-[#040505]">{accountName} {masked}</span>
               </div>
               {/* Funds Section */}
               <div className="bg-white border border-[#e8e9e9] flex flex-col gap-[2px] w-full">
@@ -295,40 +319,83 @@ export default function ExecutionSummary() {
               </div>
             )}
 
-            {/* Tax Rows */}
+            {/* Tax Rows. IRA banner redesign (display/layout only, see
+                accountBanner.ts): ST/LT/Losses/Net-Taxable-Gain consolidate
+                into one informational row for either IRA type — Rule 1
+                (CLAUDE.md §13) still governs its color. */}
             <div className="flex flex-col gap-[6px] items-start p-[16px] w-full">
-              <TaxRow
-                label="ST Capital Gains realized"
-                value={stGains !== 0 ? signed(stGains) : '$0.00'}
-                valueBold={stGains !== 0}
-                valueColor={stGains > 0 ? '#007a00' : stGains < 0 ? '#c8102e' : '#717777'}
-              />
-              <TaxRow
-                label="LT Capital Gains realized"
-                value={ltGains !== 0 ? signed(ltGains) : '$0.00'}
-                valueColor={ltGains > 0 ? '#007a00' : ltGains < 0 ? '#c8102e' : '#717777'}
-              />
-              <TaxRow
-                label="Losses Harvested"
-                value={lossesHarvested !== 0 ? signed(lossesHarvested) : '$0.00'}
-                valueBold={lossesHarvested !== 0}
-                valueColor={lossesHarvested < 0 ? '#c8102e' : lossesHarvested > 0 ? '#007a00' : '#717777'}
-              />
-              <Divider />
-              <TaxRow label="Net Taxable Gain"     value={formatCurrency(netTaxableGain)} valueBold />
-              <TaxRow label="Federal Tax (estimated)" value={formatCurrency(estTotalTax)} />
+              {showSeparateGainLoss ? (
+                <>
+                  <TaxRow
+                    label="ST Capital Gains realized"
+                    value={stGains !== 0 ? signed(stGains) : '$0.00'}
+                    valueBold={stGains !== 0}
+                    valueColor={stGains > 0 ? '#007a00' : stGains < 0 ? '#c8102e' : '#717777'}
+                  />
+                  <TaxRow
+                    label="LT Capital Gains realized"
+                    value={ltGains !== 0 ? signed(ltGains) : '$0.00'}
+                    valueColor={ltGains > 0 ? '#007a00' : ltGains < 0 ? '#c8102e' : '#717777'}
+                  />
+                  <TaxRow
+                    label="Losses Harvested"
+                    value={lossesHarvested !== 0 ? signed(lossesHarvested) : '$0.00'}
+                    valueBold={lossesHarvested !== 0}
+                    valueColor={lossesHarvested < 0 ? '#c8102e' : lossesHarvested > 0 ? '#007a00' : '#717777'}
+                  />
+                  <Divider />
+                  <TaxRow label="Net Taxable Gain"     value={formatCurrency(netTaxableGain)} valueBold />
+                </>
+              ) : (
+                <TaxRow
+                  label={CONSOLIDATED_GAIN_LOSS_LABEL_TITLECASE}
+                  value={netTaxableGain !== 0 ? signed(netTaxableGain) : '$0.00'}
+                  valueBold
+                  valueColor={netTaxableGain > 0 ? '#007a00' : netTaxableGain < 0 ? '#c8102e' : '#717777'}
+                />
+              )}
+              <TaxRow label={bannerRelabelForIra(acct?.account_type, 'Federal Tax (estimated)', 'Ordinary Income Tax (estimated)')} value={formatCurrency(estTotalTax)} />
               <TaxRow label="State Tax" value="$0.00 (not included)" muted />
               <Divider />
-              <TaxRow label="EST. TOTAL TAX" value={formatCurrency(estTotalTax)} labelBold valueBold valueLg />
-              <TaxRow label="Effective rate"       value={fmtRate2(effectiveRate)} muted />
+              <TaxRow label={bannerRelabelForIra(acct?.account_type, 'EST. TOTAL TAX', 'EST. ORDINARY INCOME TAX')} value={formatCurrency(estTotalTax)} labelBold valueBold valueLg />
+              {txn && txn.funds_sold.length > 0 && (
+                <div className="flex items-center justify-end w-full pt-[2px]">
+                  <ExpandableDetail label="Breakdown">
+                    <TaxBreakdownPanel
+                      accountType={acct?.account_type}
+                      funds={txn.funds_sold.map(f => ({ est_st_gain_loss: f.st_gain_loss, est_lt_gain_loss: f.lt_gain_loss, sell_amount: f.sell_amount }))}
+                      // The exact rates active at submission time (frozen on
+                      // the record, see TransactionRecord's doc comment) —
+                      // never the store's current activeTaxRates, which could
+                      // have changed since this transaction was committed.
+                      taxRates={{ st_rate: txn.st_rate ?? 0.24, lt_rate: txn.lt_rate ?? 0.15 }}
+                      saleTotal={totalSaleAmount}
+                    />
+                  </ExpandableDetail>
+                </div>
+              )}
+              {showPenalty && (
+                <>
+                  <Divider />
+                  <TaxRow label="Early withdrawal penalty" value="N/A" muted />
+                  <div className="flex items-center justify-end w-full pt-[2px]">
+                    <ExpandableDetail label="Why?">
+                      <p className="text-[11.5px] text-vg-ink-muted leading-relaxed">{EARLY_WITHDRAWAL_PENALTY_NOTE}</p>
+                    </ExpandableDetail>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* YTD Footer */}
-            <div className="bg-[#f8f8f7] border-t border-[#e8e9e9] flex items-center p-[12px] w-full">
-              <p className="flex-1 text-[11px] text-[#717777] min-w-0">
-                Updated YTD realized — ST: {formatCurrency(cumulativeYtdST)} · LT: {formatCurrency(cumulativeYtdLT)}
-              </p>
-            </div>
+            {/* YTD Footer — a taxable-brokerage capital-gains-tracking
+                concept, doesn't apply to either IRA type's withdrawal. */}
+            {showYtd && (
+              <div className="bg-[#f8f8f7] border-t border-[#e8e9e9] flex items-center p-[12px] w-full">
+                <p className="flex-1 text-[11px] text-[#717777] min-w-0">
+                  Updated YTD realized — ST: {formatCurrency(cumulativeYtdST)} · LT: {formatCurrency(cumulativeYtdLT)}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Element 3 — Portfolio Impact */}

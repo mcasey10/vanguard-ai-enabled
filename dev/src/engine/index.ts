@@ -24,6 +24,7 @@
 import type {
   Portfolio,
   Account,
+  AccountType,
   FundHolding,
   Lot,
   AccountingMethod,
@@ -34,6 +35,7 @@ import type {
   WaitAndSaveNotice,
   AllocationImpact,
   TaxAssumptionSet,
+  TaxFigureOrNA,
 } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -321,14 +323,23 @@ function buildFundResult(
   const estSTGain = r2(lotSales.filter(ls => ls.lot.holding_period === 'ST').reduce((s, ls) => s + ls.gain, 0))
   const estLTGain = r2(lotSales.filter(ls => ls.lot.holding_period === 'LT').reduce((s, ls) => s + ls.gain, 0))
 
-  // Per-fund gross tax (before portfolio netting) — REQ-EC-001 / CLAUDE.md constraint 3
-  let estTaxGross = 0
+  // Per-fund gross tax (before portfolio netting) — REQ-EC-001 / CLAUDE.md constraint 3.
+  // Intentional, deliberate exclusion for IRA holdings (DECISIONS.md IRA
+  // ordinary-income tax entry) — DO NOT "fix" this by adding a per-fund
+  // calculation for traditional_IRA/roth_IRA. Ordinary income tax
+  // (Traditional IRA) is computed once, at the portfolio/withdrawal level,
+  // against the total amount withdrawn from the account — it is not a
+  // property of any single fund's own gain/loss the way capital-gains tax
+  // is, so there is no correct per-fund figure to compute here. Roth IRA
+  // distributions are genuinely tax-free. 'not_applicable' (not a numeric
+  // 0) makes that explicit — a $0 here would wrongly read as "calculated,
+  // no tax owed" rather than "not computed at this level."
+  let estTaxGross: TaxFigureOrNA = 'not_applicable'
   if (account.account_type === 'taxable_brokerage') {
     const stGain = Math.max(0, estSTGain)
     const ltGain = Math.max(0, estLTGain)
     estTaxGross = r2(stGain * 0.24 + ltGain * 0.15)  // Note: actual rates from params handled in caller
   }
-  // IRA: ordinary income or tax-free — gross tax not applicable for display (shown as $0 in UI)
 
   // Allocation impact for this fund
   const totalSold = sellAmount
@@ -547,7 +558,188 @@ function selectFundsAutomated(
     }
   }
 
+  // ── PHASE 4: Top up — if every holding in the account is already spoken
+  // for (Phase 3 had no untouched holding left to draw from) but the target
+  // still isn't met, revisit already-selected holdings rather than leaving
+  // the shortfall permanently unfilled. Phase 1 deliberately caps each
+  // holding's initial fill at allocBudget/lossBudget (60%/70% split), which
+  // is fine when an account holds several funds — the other funds absorb
+  // the rest in Phase 3. It silently under-fills for a single-holding (or
+  // fully-drift-concentrated) account, since that one holding is already
+  // "used" and Phase 3 skips it. Found live: a $25,000 request against a
+  // Roth IRA holding only VFIAX produced just $15,000 (60% allocBudget)
+  // sold, with the other 40% never reaching any holding at all, while the
+  // UI still displayed the original $25,000 as the sale total. Re-selects
+  // lots for the holding's full new target (existing + additional) rather
+  // than accumulating separately — selectLots is a pure function of a
+  // holding and a target amount, so this is a safe, complete replacement.
+  if (remaining > 0.005) {
+    const toppableHoldings = [...fundSales.keys()]
+      .map(fundId => account.holdings.find(h => h.fund_id === fundId))
+      .filter((h): h is FundHolding => h !== undefined)
+      .sort((a, b) => a.total_unrealized_gain_loss - b.total_unrealized_gain_loss)
+
+    for (const holding of toppableHoldings) {
+      if (remaining <= 0.005) break
+      const existingLots = fundSales.get(holding.fund_id)!
+      const alreadySold = r2(existingLots.reduce((s, ls) => s + ls.proceeds, 0))
+      const capacity = r2(holding.current_balance - alreadySold)
+      if (capacity <= 0.005) continue
+      const newTarget = r2(alreadySold + Math.min(remaining, capacity))
+      const lotSales = selectLots(holding, newTarget, 'MinTax', account.account_type, rates)
+      if (lotSales.length === 0) continue
+      const newProceeds = r2(lotSales.reduce((s, ls) => s + ls.proceeds, 0))
+      fundSales.set(holding.fund_id, lotSales)
+      remaining = r2(remaining - (newProceeds - alreadySold))
+    }
+  }
+
   return fundSales
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio-level net tax — shared by runOptimization() (automated mode) and
+// scenarioBuilder.ts's buildScenarioFromFundResults() (Manual mode scenario
+// save). Extracted here rather than duplicated a second time (DECISIONS.md,
+// "Manual mode IRA tax fix" entry): before this extraction,
+// buildScenarioFromFundResults() had its own hand-copied version of this
+// exact three-way branch, which was a real "two places computing the same
+// fact" drift risk (CLAUDE.md's own named failure pattern) — it still had
+// D083's original two-way taxable/non-taxable gate at the point this was
+// found, not yet updated for Traditional IRA. Both call sites pass real
+// FundSaleResult[] with identical shapes, so this took the same inputs
+// either way; no adapter layer was needed to unify them.
+// ---------------------------------------------------------------------------
+
+/**
+ * The intermediates computeNetTax() computes internally but previously threw
+ * away, returning only the final total — added for the breakdown-expander
+ * task (DECISIONS.md's breakdown-expanders entry) so the UI's "Breakdown ▾"
+ * panel can display the real steps the engine actually took, not a second,
+ * independently-derived approximation of them. `taxableAtST`/`taxableAtLT`
+ * are NOT the same as `netSTGain`/`netLTGain` whenever one category is a
+ * loss and the other a gain that outweighs it — the engine attributes the
+ * portfolio's net taxable amount to ST first (capped at the real ST gain),
+ * then whatever remains to LT, which is a genuinely different number from
+ * "each category's own raw gain times its own rate" the moment there's any
+ * cross-category netting. A UI that displayed `netSTGain * st_rate` and
+ * `netLTGain * lt_rate` as its two tax lines would NOT sum to this same
+ * function's own `total` in that case — verified by hand and covered by a
+ * dedicated engine.test.ts case; see that test for the worked numbers.
+ */
+export interface NetTaxBreakdown {
+  /** Raw net gain/loss per category, summed across every fund — a gain/loss
+   *  figure, not a tax figure. Always well-defined regardless of account
+   *  type (the underlying sums don't depend on how the total is taxed). */
+  netSTGain: number
+  netLTGain: number
+  /** The blended-rate attribution actually used to compute tax (taxable-
+   *  brokerage only) — equals netSTGain/netLTGain exactly whenever both
+   *  categories are non-negative, diverges only under cross-category
+   *  netting (see the class comment above). Both are always >= 0. */
+  taxableAtST: number
+  taxableAtLT: number
+  /** Tax owed on each portion, taxable-brokerage only — 0 for either IRA
+   *  type, since neither taxes ST/LT gain separately. */
+  stTax: number
+  ltTax: number
+  /** Sum of every fund's sell_amount — the figure Traditional IRA's
+   *  ordinary-income tax is actually computed against. */
+  totalWithdrawal: number
+  /** Traditional IRA only — totalWithdrawal * st_rate. 0 for every other
+   *  account type. */
+  ordinaryIncomeTax: number
+  /** The exact same number computeNetTax() returns — byte-identical, since
+   *  computeNetTax() is now a thin wrapper around this function. */
+  total: number
+}
+
+export function computeNetTaxBreakdown(
+  fundResults: Pick<FundSaleResult, 'est_st_gain_loss' | 'est_lt_gain_loss' | 'sell_amount'>[],
+  accountType: AccountType | undefined,
+  taxRates: Pick<TaxAssumptionSet, 'st_rate' | 'lt_rate'>
+): NetTaxBreakdown {
+  const netSTGain = r2(fundResults.reduce((s, fr) => s + fr.est_st_gain_loss, 0))
+  const netLTGain = r2(fundResults.reduce((s, fr) => s + fr.est_lt_gain_loss, 0))
+  const netGain = r2(netSTGain + netLTGain)
+  // All gains net against all losses at portfolio level; negative net = $0 tax
+  const netTaxable = Math.max(0, netGain)
+  // Apply blended rate: if net is positive, attribute tax first to ST gains
+  const taxableAtST = Math.min(netTaxable, Math.max(0, netSTGain))
+  const taxableAtLT = Math.max(0, netTaxable - taxableAtST)
+  const totalWithdrawal = r2(fundResults.reduce((s, fr) => s + fr.sell_amount, 0))
+
+  let stTax = 0
+  let ltTax = 0
+  let ordinaryIncomeTax = 0
+  let total = 0
+
+  // Explicit three-way branch, not a two-way gate with an implicit
+  // fallthrough — each account type's tax treatment is a genuinely
+  // different computation, not a variation on one formula (CLAUDE.md
+  // constraint 2).
+  if (accountType === 'taxable_brokerage') {
+    // Capital gains, netted ST against LT across all funds sold. `total` is
+    // computed in one r2() around the summed raw products — byte-identical
+    // to the pre-refactor formula — never by summing two independently-
+    // rounded stTax/ltTax, which could disagree with it by a cent under
+    // double-rounding. stTax is rounded normally; ltTax is then defined as
+    // the *remainder* (total - stTax), not its own independent rounding —
+    // this guarantees stTax + ltTax === total exactly, by construction, for
+    // every input, not just the ones a test happens to check.
+    const rawStTax = taxableAtST * taxRates.st_rate
+    const rawLtTax = taxableAtLT * taxRates.lt_rate
+    total = r2(rawStTax + rawLtTax)
+    stTax = r2(rawStTax)
+    ltTax = r2(total - stTax)
+  } else if (accountType === 'traditional_IRA') {
+    // Traditional IRA distributions are taxed as ordinary income on the
+    // FULL withdrawal amount, regardless of lot-level gain/loss — never
+    // netted against gains/losses the way taxable-brokerage capital
+    // gains are (CLAUDE.md constraint 2). st_rate is legally valid here
+    // even though this isn't a capital gain: short-term capital gains
+    // are taxed at the taxpayer's ordinary marginal rate under US tax
+    // law (there is no separate ST schedule), so st_rate already
+    // represents this investor's real ordinary income rate — not a
+    // coincidence of the sample data, a fact of how st_rate is defined.
+    ordinaryIncomeTax = r2(totalWithdrawal * taxRates.st_rate)
+    total = ordinaryIncomeTax
+  } else {
+    // roth_IRA (qualified distributions are tax-free), an unresolved
+    // account (accountType undefined), or anything else: its own explicit
+    // branch — not a shared fallthrough with traditional_IRA now that
+    // Traditional IRA has real logic above, and not a shared fallthrough
+    // with the old "everything non-taxable" case that used to cover both
+    // (D057's original gate).
+    total = 0
+  }
+
+  return { netSTGain, netLTGain, taxableAtST, taxableAtLT, stTax, ltTax, totalWithdrawal, ordinaryIncomeTax, total }
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio-level net tax — shared by runOptimization() (automated mode) and
+// scenarioBuilder.ts's buildScenarioFromFundResults() (Manual mode scenario
+// save). Extracted here rather than duplicated a second time (DECISIONS.md,
+// "Manual mode IRA tax fix" entry): before this extraction,
+// buildScenarioFromFundResults() had its own hand-copied version of this
+// exact three-way branch, which was a real "two places computing the same
+// fact" drift risk (CLAUDE.md's own named failure pattern) — it still had
+// D083's original two-way taxable/non-taxable gate at the point this was
+// found, not yet updated for Traditional IRA. Both call sites pass real
+// FundSaleResult[] with identical shapes, so this took the same inputs
+// either way; no adapter layer was needed to unify them. Now a thin wrapper
+// around computeNetTaxBreakdown() (breakdown-expanders task) — every
+// existing call site keeps getting exactly the same number, computed the
+// exact same way, with zero behavior change.
+// ---------------------------------------------------------------------------
+
+export function computeNetTax(
+  fundResults: Pick<FundSaleResult, 'est_st_gain_loss' | 'est_lt_gain_loss' | 'sell_amount'>[],
+  accountType: AccountType | undefined,
+  taxRates: Pick<TaxAssumptionSet, 'st_rate' | 'lt_rate'>
+): number {
+  return computeNetTaxBreakdown(fundResults, accountType, taxRates).total
 }
 
 // ---------------------------------------------------------------------------
@@ -592,20 +784,23 @@ export function runOptimization(params: OptimizationParams): OptimizationResult 
       if (account.account_type === 'taxable_brokerage') {
         fr.est_tax_gross = r2(estSTGain * activeTaxRates.st_rate + estLTGain * activeTaxRates.lt_rate)
       }
+      // traditional_IRA / roth_IRA: intentionally left as buildFundResult()
+      // already set it ('not_applicable') — see the comment there. Explicit
+      // no-op branch, not a silent fallthrough, so a future reader doesn't
+      // "fix" this by adding a per-fund calculation that was deliberately
+      // excluded (ordinary income tax is a portfolio-level figure, computed
+      // below against the total withdrawal, not per fund).
       fundResults.push(fr)
     }
 
-    // Portfolio-level netting (REQ-EC-001 / CLAUDE.md constraint 3)
-    const totalSTGain = r2(fundResults.reduce((s, fr) => s + fr.est_st_gain_loss, 0))
-    const totalLTGain = r2(fundResults.reduce((s, fr) => s + fr.est_lt_gain_loss, 0))
-    const netGain = r2(totalSTGain + totalLTGain)
-    // All gains net against all losses at portfolio level; negative net = $0 tax
-    const netTaxable = Math.max(0, netGain)
-    // Apply blended rate: if net is positive, attribute tax first to ST gains
-    const taxableAtST = Math.min(netTaxable, Math.max(0, totalSTGain))
-    const taxableAtLT = Math.max(0, netTaxable - taxableAtST)
-    const estNetTax = r2(taxableAtST * activeTaxRates.st_rate + taxableAtLT * activeTaxRates.lt_rate)
+    // Portfolio-level tax (REQ-EC-001 / CLAUDE.md constraint 3) — the total
+    // dollar amount actually withdrawn from this account in this
+    // transaction, summed across every fund sold; needed for the
+    // effective-rate denominator below (computeNetTax() re-derives its own
+    // copy internally for the traditional_IRA branch, since it must remain
+    // a self-contained function callable from scenarioBuilder.ts too).
     const totalSaleAmount = r2(fundResults.reduce((s, fr) => s + fr.sell_amount, 0))
+    const estNetTax = computeNetTax(fundResults, account.account_type, activeTaxRates)
     const effectiveRate = totalSaleAmount > 0 ? r2((estNetTax / totalSaleAmount) * 100) / 100 : 0
 
     const allocationImpact = computeAllocationImpact(portfolio, fundResults)
@@ -621,6 +816,13 @@ export function runOptimization(params: OptimizationParams): OptimizationResult 
       optimization_priority: optimizationPriority,
       fund_results: fundResults,
       est_net_tax: estNetTax,
+      // Groundwork only (see the field's own doc comment, types/index.ts) —
+      // always not-applicable for this dataset's investor (age 73, per
+      // sample-dataset.json's note_retirement_status). No calculation is
+      // performed yet; this is not a per-account-type branch because the
+      // condition that makes it inapplicable (retirement age) is the same
+      // for every account in this single-investor dataset.
+      est_early_withdrawal_penalty: 'not_applicable',
       effective_rate: effectiveRate,
       allocation_impact: allocationImpact,
       plain_language_rationale: allFundRationale,
@@ -680,6 +882,10 @@ export function runOptimization(params: OptimizationParams): OptimizationResult 
       if (account.account_type === 'taxable_brokerage') {
         fr.est_tax_gross = r2(estSTGain * activeTaxRates.st_rate + estLTGain * activeTaxRates.lt_rate)
       }
+      // traditional_IRA / roth_IRA: intentionally left as buildFundResult()
+      // already set it ('not_applicable') — same rule as the automated
+      // branch's identical gate above; Manual mode has no portfolio-level
+      // tax figure of its own to compute ordinary income tax into yet.
       fundResults.push(fr)
     }
 

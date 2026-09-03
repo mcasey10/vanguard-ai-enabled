@@ -65,7 +65,7 @@ export const geminiGenerator: NarrationGenerator = {
     }
 
     if (!res.ok) {
-      throw new NarrationApiError(`Gemini API returned ${res.status}`)
+      throw new NarrationApiError(`Gemini API returned ${res.status}`, res.status)
     }
 
     const body = await res.json() as InteractionResponse

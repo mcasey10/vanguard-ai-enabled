@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Sparkles, PenLine, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { useModeToggleGuard, SaveDiscardDialog } from '../components/ModeToggleGuard'
+import { TaxBracketDialog } from '../components/TaxBracketDialog'
 import { formatCurrency, formatShares, accountAllocStr } from '../utils/format'
 
 function RadioDot({ selected }: { selected: boolean }) {
@@ -19,6 +20,7 @@ export default function FundSelectionManual() {
   const { portfolio, activeTaxRates } = useAppStore()
 
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
+  const [taxBracketOpen, setTaxBracketOpen] = useState(false)
   function toggleAccount(id: string) {
     setExpandedAccounts(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }
@@ -35,6 +37,7 @@ export default function FundSelectionManual() {
   return (
     <>
       {showModeDialog && <SaveDiscardDialog onSave={handleSave} onDiscard={handleDiscard} onClose={handleClose} />}
+      {taxBracketOpen && <TaxBracketDialog onClose={() => setTaxBracketOpen(false)} />}
 
       <div className="flex flex-col items-start w-full">
         <div className="flex flex-col gap-6 py-10 w-full">
@@ -65,7 +68,7 @@ export default function FundSelectionManual() {
               <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
                 <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">TAX BRACKET</span>
                 <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{Math.round(activeTaxRates.st_rate * 100)}% ST / {Math.round(activeTaxRates.lt_rate * 100)}% LT</span>
-                <a className="text-[12px] text-[#1255cc] underline cursor-pointer whitespace-nowrap">Change</a>
+                <a onClick={() => setTaxBracketOpen(true)} className="text-[12px] text-[#1255cc] underline cursor-pointer whitespace-nowrap">Change</a>
               </div>
               <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
               <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">

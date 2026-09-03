@@ -7,6 +7,7 @@
  */
 
 import { buildDeterministicFallback, type NarrationInput } from './narrationShared'
+import { recordProviderFailure, recordProviderSuccess } from './providerFailureTracker'
 
 export interface NarrationResult {
   text: string
@@ -19,16 +20,25 @@ export interface NarrationResult {
 // invalidation infrastructure to keep a persisted cache honest).
 const cache = new Map<string, NarrationResult>()
 
-function cacheKey(input: NarrationInput): string {
+function cacheKey(input: NarrationInput, provider?: string): string {
   // Stable stringify: NarrationInput's own field order is already fixed by
   // how callers construct it, and JSON.stringify is deterministic for a
   // given object's insertion order — sufficient for a same-session cache
-  // where nothing else mutates these objects after construction.
-  return `${input.touchpoint}:${JSON.stringify(input)}`
+  // where nothing else mutates these objects after construction. Provider
+  // (D071) is folded into the key too — the same figures narrated by two
+  // different providers are two different results, not one cache entry.
+  return `${input.touchpoint}:${provider ?? 'default'}:${JSON.stringify(input)}`
 }
 
-export async function getNarration(input: NarrationInput): Promise<NarrationResult> {
-  const key = cacheKey(input)
+/**
+ * `provider` (D071) is the Demo Settings dialog's runtime selection, sent as
+ * a sibling field on the request body — never part of NarrationInput itself
+ * (that stays exactly the CD-4.2 boundary contract: only already-computed
+ * figures). Omit it to use whichever provider NARRATION_PROVIDER resolves to
+ * server-side, unchanged behavior from before this parameter existed.
+ */
+export async function getNarration(input: NarrationInput, provider?: string): Promise<NarrationResult> {
+  const key = cacheKey(input, provider)
   const cached = cache.get(key)
   if (cached) return cached
 
@@ -37,11 +47,22 @@ export async function getNarration(input: NarrationInput): Promise<NarrationResu
     const res = await fetch('/api/narrate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify(provider ? { ...input, provider } : input),
     })
-    if (!res.ok) throw new Error(`narrate API returned ${res.status}`)
-    const body = await res.json() as { text?: string; error?: string }
+    if (!res.ok) {
+      // providerStatus/providerName are internal-use-only fields the API
+      // route adds for exactly this purpose (dev/api/narrate.ts) — never
+      // shown to the user as text, only fed to the provider-failure
+      // indicator so a real failure here still updates it even though the
+      // touchpoint itself silently recovers via the deterministic fallback
+      // below.
+      const body = await res.json().catch(() => ({})) as { error?: string; providerStatus?: number; providerName?: string }
+      if (body.providerName) recordProviderFailure(body.providerName, body.providerStatus)
+      throw new Error(body.error ?? `narrate API returned ${res.status}`)
+    }
+    const body = await res.json() as { text?: string; error?: string; providerName?: string }
     if (!body.text) throw new Error(body.error ?? 'narrate API returned no text')
+    if (body.providerName) recordProviderSuccess(body.providerName)
     result = { text: body.text, aiGenerated: true }
   } catch {
     result = { text: buildDeterministicFallback(input), aiGenerated: false }

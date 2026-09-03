@@ -1,14 +1,22 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { formatCurrency, formatShares, formatPercent, accountAllocStr } from '../utils/format'
+import { formatCurrency, formatShares, formatPercent, accountAllocStr, formatTaxFigure } from '../utils/format'
+import {
+  bannerRateDisplay, bannerShowYtdRealized, bannerShowSeparateGainLoss, CONSOLIDATED_GAIN_LOSS_LABEL,
+  bannerNetTaxLabel, bannerShowEarlyWithdrawalPenalty, EARLY_WITHDRAWAL_PENALTY_LABEL,
+  EARLY_WITHDRAWAL_PENALTY_VALUE, EARLY_WITHDRAWAL_PENALTY_NOTE,
+} from '../utils/accountBanner'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Sparkles, PenLine, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { useModeToggleGuard, SaveDiscardDialog } from '../components/ModeToggleGuard'
 import { CostBasisDialog } from '../components/CostBasisDialog'
 import { CoachMark } from '../components/CoachMark'
+import { ExpandableDetail } from '../components/ExpandableDetail'
+import { TaxBreakdownPanel } from '../components/TaxBreakdownPanel'
 import { TargetAllocationModal } from '../components/TargetAllocationModal'
+import { TaxBracketDialog } from '../components/TaxBracketDialog'
 import { useAppStore } from '../store/useAppStore'
-import { runOptimization, shortAssetClass } from '../engine/index'
-import type { CostBasisMethod, Lot as CanonicalLot } from '../types'
+import { runOptimization, shortAssetClass, computeNetTax } from '../engine/index'
+import type { CostBasisMethod, Lot as CanonicalLot, TaxFigureOrNA } from '../types'
 import { toAccountingMethod } from '../utils/methods'
 import { buildScenarioFromFundResults, isDuplicateScenario } from '../utils/scenarioBuilder'
 
@@ -69,10 +77,6 @@ function toDisplayLot(l: CanonicalLot): Lot {
 
 function fmtSigned(n: number): string {
   return (n >= 0 ? '+' : '−') + formatCurrency(Math.abs(n))
-}
-// 2-decimal rate for effective rate display (Intl, no toFixed)
-function fmtRate2(n: number): string {
-  return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 }
 
 // ---------------------------------------------------------------------------
@@ -529,10 +533,12 @@ export default function FundSelectionManualLot() {
         const fr = config.fund_results.find(r => r.fund_id === fund)
         if (fr) {
           const stg = fr.est_st_gain_loss, ltg = fr.est_lt_gain_loss
-          const netGain = Math.max(0, r2(stg + ltg))
-          const taxST   = Math.min(netGain, Math.max(0, stg)) * activeTaxRates.st_rate
-          const taxLT   = Math.max(0, netGain - Math.min(netGain, Math.max(0, stg))) * activeTaxRates.lt_rate
-          const estNetTax = r2(taxST + taxLT)
+          // Shared three-way branch (engine/index.ts), not a hand-copied
+          // taxable-only gate — see DECISIONS.md's Manual mode IRA tax fix
+          // entry. This bannerData.estNetTax field is not currently
+          // rendered anywhere in this component, but was still worth fixing
+          // rather than leaving a duplicated-and-wrong formula in place.
+          const estNetTax = computeNetTax([fr], taxableAcct?.account_type, activeTaxRates)
           const totalSale = fr.sell_amount
           setBannerData({
             totalSale,
@@ -573,6 +579,7 @@ export default function FundSelectionManualLot() {
 
   // Modal state
   const [showAllocModal,  setShowAllocModal]  = useState(false)
+  const [taxBracketOpen, setTaxBracketOpen] = useState(false)
   // Cost basis for the collapsed other-fund row — read from store, not hardcoded
   const [collapsedMethod, setCollapsedMethod] = useState<CostBasisMethod>(
     manualCostBasisMethods[fund === 'VTSAX' ? 'VBTLX' : 'VTSAX'] ?? 'MinTax'
@@ -617,10 +624,12 @@ export default function FundSelectionManualLot() {
       pricePerShare = lot.current_nav
     }
     priceDate = '05/27/2026' // canonical portfolio reference date
-    const netGain = Math.max(0, r2(stGainLoss + ltGainLoss))
-    const taxST = Math.min(netGain, Math.max(0, stGainLoss)) * activeTaxRates.st_rate
-    const taxLT = Math.max(0, netGain - Math.min(netGain, Math.max(0, stGainLoss))) * activeTaxRates.lt_rate
-    const estNetTax = r2(taxST + taxLT)
+    // Shared three-way branch (engine/index.ts), not a hand-copied
+    // taxable-only gate — see DECISIONS.md's Manual mode IRA tax fix entry.
+    // This bannerData.estNetTax field is not currently rendered anywhere in
+    // this component, but was still worth fixing rather than leaving a
+    // duplicated-and-wrong formula in place.
+    const estNetTax = computeNetTax([{ est_st_gain_loss: stGainLoss, est_lt_gain_loss: ltGainLoss, sell_amount: totalSale }], taxableAcct?.account_type, activeTaxRates)
     const effRate = totalSale > 0 ? r2((estNetTax / totalSale) * 100) : 0
     const salePct = r2((totalSale / portfolio.total_investable_balance) * 100)
     setBannerData({ totalSale, salePct, stGainLoss, ltGainLoss, estNetTax, effRate, totalShares, totalCost, pricePerShare, priceDate })
@@ -684,10 +693,12 @@ export default function FundSelectionManualLot() {
     const fr = manualConfig.fund_results.find(r => r.fund_id === fund)
     if (!fr) return
     const stg = fr.est_st_gain_loss, ltg = fr.est_lt_gain_loss
-    const netGain   = Math.max(0, r2(stg + ltg))
-    const taxST     = Math.min(netGain, Math.max(0, stg)) * activeTaxRates.st_rate
-    const taxLT     = Math.max(0, netGain - Math.min(netGain, Math.max(0, stg))) * activeTaxRates.lt_rate
-    const estNetTax = r2(taxST + taxLT)
+    // Shared three-way branch (engine/index.ts), not a hand-copied
+    // taxable-only gate — see DECISIONS.md's Manual mode IRA tax fix entry.
+    // This bannerData.estNetTax field is not currently rendered anywhere in
+    // this component, but was still worth fixing rather than leaving a
+    // duplicated-and-wrong formula in place.
+    const estNetTax = computeNetTax([fr], taxableAcct?.account_type, activeTaxRates)
     const totalSale = fr.sell_amount
     setBannerData({
       totalSale,
@@ -709,7 +720,7 @@ export default function FundSelectionManualLot() {
   function handleGoToScenarios() {
     const fundResults = manualConfig?.fund_results ?? []
     if (fundResults.length > 0 && portfolio) {
-      const scenario = buildScenarioFromFundResults(fundResults, portfolio, activeTaxRates, null)
+      const scenario = buildScenarioFromFundResults(fundResults, portfolio, activeTaxRates, null, activeAccountId)
       if (scenario) {
         if (activeScenarioId) {
           updateScenario(activeScenarioId, { ...scenario, scenario_id: activeScenarioId })
@@ -760,7 +771,7 @@ export default function FundSelectionManualLot() {
       estSTColor: stg !== null ? (stg > 0 ? 'text-[#007a00]' : stg < 0 ? 'text-[#c8102e]' : 'text-vg-ink') : 'text-vg-ink',
       estLTGains: ltg !== null ? (ltg !== 0 ? fmtSigned(ltg) : formatCurrency(0)) : '—',
       estLTColor: ltg !== null ? (ltg > 0 ? 'text-[#007a00]' : ltg < 0 ? 'text-[#c8102e]' : 'text-vg-ink') : 'text-vg-ink',
-      estTax: fr ? formatCurrency(fr.est_tax_gross) : '—',
+      estTax: fr ? formatTaxFigure(fr.est_tax_gross) : '—',
       impact: impact !== null
         ? `${impact <= 0 ? '−' : '+'}${fmtPct1(Math.abs(impact))}% ${shortAssetClass(assetClass)}`
         : '—',
@@ -788,17 +799,32 @@ export default function FundSelectionManualLot() {
     const totalSell  = r2(results.reduce((s, fr) => s + fr.sell_amount, 0))
     const stGain     = r2(results.reduce((s, fr) => s + fr.est_st_gain_loss, 0))
     const ltGain     = r2(results.reduce((s, fr) => s + fr.est_lt_gain_loss, 0))
-    const netGain    = Math.max(0, r2(stGain + ltGain))
-    const taxST      = Math.min(netGain, Math.max(0, stGain)) * activeTaxRates.st_rate
-    const taxLT      = Math.max(0, netGain - Math.min(netGain, Math.max(0, stGain))) * activeTaxRates.lt_rate
-    const estNetTax  = r2(taxST + taxLT)
+    // The same shared three-way branch (taxable_brokerage / traditional_IRA
+    // / roth_IRA) engine/index.ts's runOptimization() and scenarioBuilder.ts
+    // use — not yet another hand-copied implementation. This is the actual
+    // source of this page's real, rendered "EST. NET TAX" header figure
+    // (via combinedBanner.estNetTax below) — found still showing $0 for a
+    // live Traditional IRA sale while live-verifying the Manual mode IRA
+    // tax fix, since it was never updated when Traditional IRA's
+    // ordinary-income tax was added to the engine (see DECISIONS.md's
+    // Manual mode IRA tax fix entry).
+    const estNetTax  = computeNetTax(results, taxableAcct?.account_type, activeTaxRates)
     const salePct    = r2((totalSell / portfolio.total_investable_balance) * 100)
     const effRate    = totalSell > 0 ? r2((estNetTax / totalSell) * 100) : 0
     return { totalSell, stGain, ltGain, estNetTax, salePct, effRate }
-  }, [manualConfig, portfolio, activeTaxRates])
+  }, [manualConfig, portfolio, activeTaxRates, activeAccountId])
+
+  // IRA banner redesign — display/layout only, see accountBanner.ts.
+  const rateDisplay = bannerRateDisplay(taxableAcct?.account_type, activeTaxRates)
+  const showYtd = bannerShowYtdRealized(taxableAcct?.account_type)
+  const showSeparateGainLoss = bannerShowSeparateGainLoss(taxableAcct?.account_type)
+  const combinedGainLoss = combinedBanner ? combinedBanner.stGain + combinedBanner.ltGain : null
+  const netTaxLabel = bannerNetTaxLabel(taxableAcct?.account_type)
+  const showPenalty = bannerShowEarlyWithdrawalPenalty(taxableAcct?.account_type)
 
   return (
     <>
+      {taxBracketOpen && <TaxBracketDialog onClose={() => setTaxBracketOpen(false)} />}
       {/* Target Allocation Modal */}
       {showAllocModal && <TargetAllocationModal onClose={() => setShowAllocModal(false)} />}
 
@@ -858,41 +884,82 @@ export default function FundSelectionManualLot() {
               </div>
               <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
               <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">TAX BRACKET</span>
-                <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{Math.round(activeTaxRates.st_rate * 100)}% ST / {Math.round(activeTaxRates.lt_rate * 100)}% LT</span>
-                <a className="text-[12px] text-[#1255cc] underline cursor-pointer whitespace-nowrap">Change</a>
+                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{rateDisplay.label}</span>
+                <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{rateDisplay.value}</span>
+                {rateDisplay.changeable && (
+                  <a onClick={() => setTaxBracketOpen(true)} className="text-[12px] text-[#1255cc] underline cursor-pointer whitespace-nowrap">Change</a>
+                )}
               </div>
               <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+              {showYtd && (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">YTD REALIZED</span>
+                    {portfolio?.ytd_gains_record ? (
+                      <>
+                        <span className="text-[12px] text-vg-ink whitespace-nowrap">ST {formatCurrency(portfolio.ytd_gains_record.st_gains_realized_ytd)}</span>
+                        <span className="text-[12px] text-vg-ink whitespace-nowrap">LT {formatCurrency(portfolio.ytd_gains_record.lt_gains_realized_ytd)}</span>
+                      </>
+                    ) : <span className="text-[12px] text-vg-ink-muted">—</span>}
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              )}
+              {showSeparateGainLoss ? (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. ST GAINS</span>
+                    <span className={`text-[16px] font-bold whitespace-nowrap ${combinedBanner && combinedBanner.stGain > 0 ? 'text-[#007a00]' : combinedBanner && combinedBanner.stGain < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
+                      {combinedBanner ? fmtSigned(combinedBanner.stGain) : '—'}
+                    </span>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. LT GAINS</span>
+                    <span className={`text-[16px] font-bold whitespace-nowrap ${combinedBanner && combinedBanner.ltGain > 0 ? 'text-[#007a00]' : combinedBanner && combinedBanner.ltGain < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
+                      {combinedBanner ? fmtSigned(combinedBanner.ltGain) : '—'}
+                    </span>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{CONSOLIDATED_GAIN_LOSS_LABEL}</span>
+                    <span className={`text-[16px] font-bold whitespace-nowrap ${combinedGainLoss !== null && combinedGainLoss > 0 ? 'text-[#007a00]' : combinedGainLoss !== null && combinedGainLoss < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
+                      {combinedGainLoss !== null ? fmtSigned(combinedGainLoss) : '—'}
+                    </span>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              )}
               <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">YTD REALIZED</span>
-                {portfolio?.ytd_gains_record ? (
-                  <>
-                    <span className="text-[12px] text-vg-ink whitespace-nowrap">ST {formatCurrency(portfolio.ytd_gains_record.st_gains_realized_ytd)}</span>
-                    <span className="text-[12px] text-vg-ink whitespace-nowrap">LT {formatCurrency(portfolio.ytd_gains_record.lt_gains_realized_ytd)}</span>
-                  </>
-                ) : <span className="text-[12px] text-vg-ink-muted">—</span>}
-              </div>
-              <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
-              <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. ST GAINS</span>
-                <span className={`text-[16px] font-bold whitespace-nowrap ${combinedBanner && combinedBanner.stGain > 0 ? 'text-[#007a00]' : combinedBanner && combinedBanner.stGain < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
-                  {combinedBanner ? fmtSigned(combinedBanner.stGain) : '—'}
-                </span>
-              </div>
-              <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
-              <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. LT GAINS</span>
-                <span className={`text-[16px] font-bold whitespace-nowrap ${combinedBanner && combinedBanner.ltGain > 0 ? 'text-[#007a00]' : combinedBanner && combinedBanner.ltGain < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
-                  {combinedBanner ? fmtSigned(combinedBanner.ltGain) : '—'}
-                </span>
-              </div>
-              <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
-              <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. NET TAX</span>
+                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{netTaxLabel}</span>
                 <span className="text-[16px] font-bold text-vg-ink whitespace-nowrap">{combinedBanner ? formatCurrency(combinedBanner.estNetTax) : '—'}</span>
-                <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{combinedBanner ? fmtRate2(combinedBanner.effRate) + '% effective rate' : ''}</span>
+                {combinedBanner && manualConfig && (
+                  <ExpandableDetail label="Breakdown">
+                    <TaxBreakdownPanel
+                      accountType={taxableAcct?.account_type}
+                      funds={manualConfig.fund_results}
+                      taxRates={activeTaxRates}
+                      saleTotal={combinedBanner.totalSell}
+                    />
+                  </ExpandableDetail>
+                )}
               </div>
               <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+              {showPenalty && (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{EARLY_WITHDRAWAL_PENALTY_LABEL}</span>
+                    <span className="text-[16px] font-bold text-vg-ink whitespace-nowrap">{EARLY_WITHDRAWAL_PENALTY_VALUE}</span>
+                    <ExpandableDetail label="Why?">
+                      <p className="text-[11.5px] text-vg-ink-muted leading-relaxed">{EARLY_WITHDRAWAL_PENALTY_NOTE}</p>
+                    </ExpandableDetail>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              )}
               {(() => {
                 const allocImpact = manualConfig?.allocation_impact ?? null
                 const equityDelta = allocImpact ? r2(
@@ -1022,10 +1089,28 @@ export default function FundSelectionManualLot() {
                     </div>
                   </div>
                   {(() => {
-                    // Per-fund gross tax = tax on this fund's own gain, before portfolio-level netting
+                    // Per-fund gross tax = tax on this fund's own gain, before portfolio-level netting.
+                    // Computed locally from bannerData (the live, currently-typed
+                    // lot selection), not read from manualConfig.fund_results'
+                    // own est_tax_gross — deliberately kept separate, not
+                    // consolidated into the shared structure: EST. ST/LT GAINS
+                    // in this same banner already read live bannerData rather
+                    // than the last-committed engine result, specifically so
+                    // the banner reflects what the user just typed/selected
+                    // before a recompute has caught up; reading est_tax_gross
+                    // from manualConfig here instead would reintroduce exactly
+                    // that staleness for this one figure while its neighboring
+                    // gain figures stayed live. Same not-applicable sentinel as
+                    // every other per-fund site (DECISIONS.md's Manual mode IRA
+                    // tax fix entry), just computed in place rather than
+                    // sourced from FundSaleResult.est_tax_gross directly.
                     const stg = bannerData?.stGainLoss ?? 0
                     const ltg = bannerData?.ltGainLoss ?? 0
-                    const grossTax = r2(Math.max(0, stg) * activeTaxRates.st_rate + Math.max(0, ltg) * activeTaxRates.lt_rate)
+                    // Per-fund gross tax applies only to taxable brokerage —
+                    // same gate as engine/index.ts's buildFundResult() (D057).
+                    const grossTax: TaxFigureOrNA = taxableAcct?.account_type === 'taxable_brokerage'
+                      ? r2(Math.max(0, stg) * activeTaxRates.st_rate + Math.max(0, ltg) * activeTaxRates.lt_rate)
+                      : 'not_applicable'
                     const stColor = stg > 0 ? 'text-[#007a00]' : stg < 0 ? 'text-[#c8102e]' : 'text-vg-ink'
                     const ltColor = ltg < 0 ? 'text-[#c8102e]' : ltg > 0 ? 'text-[#007a00]' : 'text-vg-ink'
                     return (<>
@@ -1044,7 +1129,7 @@ export default function FundSelectionManualLot() {
                   <div className="w-[85px] h-full flex flex-col justify-center gap-[3px] px-2 shrink-0">
                     <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. TAX</span>
                     <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">
-                      {bannerData ? formatCurrency(grossTax) : '—'}
+                      {bannerData ? formatTaxFigure(grossTax) : '—'}
                     </span>
                   </div>
                     </>)
@@ -1327,13 +1412,20 @@ export default function FundSelectionManualLot() {
             </div>
           </div>
 
-          {/* Footer — same as FS-MAN-2 */}
-          <div className="flex gap-3 items-center px-8 w-full">
-            <button className="h-[48px] px-7 rounded-full bg-vg-ink text-white text-[14px] font-bold whitespace-nowrap hover:opacity-90">Review order</button>
-            <button onClick={handleGoToScenarios} className="h-[48px] px-7 rounded-full border-[1.5px] border-vg-ink text-vg-ink bg-white text-[14px] font-bold whitespace-nowrap hover:opacity-90 transition-opacity">Go to Scenario Analysis</button>
+          {/* Footer — same as FS-MAN-2, including its justify-between
+              alignment fix: reset link pinned left, primary+secondary
+              actions grouped right (see DECISIONS.md, incidental cleanup
+              entry) — matches Automated mode's own footer and Execution
+              Confirmation's link/button pairing, not new spacing invented
+              for this screen. */}
+          <div className="flex items-center justify-between px-8 w-full">
             <button className="text-[14px] text-[#1255cc] underline cursor-pointer whitespace-nowrap hover:opacity-80">
               ↩ Reset to system recommendation
             </button>
+            <div className="flex gap-3 items-center">
+              <button className="h-[48px] px-7 rounded-full bg-vg-ink text-white text-[14px] font-bold whitespace-nowrap hover:opacity-90">Review order</button>
+              <button onClick={handleGoToScenarios} className="h-[48px] px-7 rounded-full border-[1.5px] border-vg-ink text-vg-ink bg-white text-[14px] font-bold whitespace-nowrap hover:opacity-90 transition-opacity">Go to Scenario Analysis</button>
+            </div>
           </div>
 
         </div>

@@ -10,10 +10,17 @@
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 import { appendTransaction } from '../data/loader'
-import type { SavedScenario, Recommendation, ManualConfiguration, TransactionRecord, TransactionFundRecord, AccountingMethod, Portfolio, TaxAssumptionSet } from '../types'
-import { formatCurrency } from '../utils/format'
+import type { SavedScenario, Recommendation, ManualConfiguration, TransactionRecord, TransactionFundRecord, AccountingMethod, Portfolio, TaxAssumptionSet, TaxFigureOrNA } from '../types'
+import { formatCurrency, accountTypeLabel, formatTaxFigure } from '../utils/format'
 import { NarrationBlock } from '../components/NarrationBlock'
 import { buildOrderConfirmationNarrationInput } from '../utils/narrationBuilders'
+import { ExpandableDetail } from '../components/ExpandableDetail'
+import { TaxBreakdownPanel } from '../components/TaxBreakdownPanel'
+import { computeNetTax } from '../engine/index'
+import {
+  bannerShowSeparateGainLoss, CONSOLIDATED_GAIN_LOSS_LABEL_TITLECASE, bannerRelabelForIra,
+  bannerShowEarlyWithdrawalPenalty, EARLY_WITHDRAWAL_PENALTY_NOTE,
+} from '../utils/accountBanner'
 
 function r2(n: number) { return Math.round(n * 100) / 100 }
 
@@ -31,9 +38,6 @@ function shortFundName(name: string): string {
     .trim()
 }
 
-function fmtRate2(n: number): string {
-  return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + '%'
-}
 
 function fmtGainLoss(n: number, period: 'ST' | 'LT' | ''): string {
   const abs = formatCurrency(Math.abs(n))
@@ -52,7 +56,14 @@ interface ConfirmData {
     sellAmount: number
     gainLoss: number
     gainLossPeriod: 'ST' | 'LT' | ''
-    estTaxGross: number
+    estTaxGross: TaxFigureOrNA
+    // Both figures, not just whichever period gainLoss/gainLossPeriod picked
+    // — a fund can genuinely have both a nonzero ST and LT gain/loss in the
+    // same transaction (a mixed-lot MinTax sale), and gainLoss/gainLossPeriod
+    // silently drops whichever one isn't ST. The tax breakdown panel needs
+    // both real per-fund figures to build its netting equation correctly.
+    stGainLoss: number
+    ltGainLoss: number
   }>
   stCapitalGains: number
   ltCapitalGains: number
@@ -60,7 +71,6 @@ interface ConfirmData {
   netTaxableGain: number
   federalTax: number
   estNetTax: number
-  effectiveRate: number
   grossProceeds: number
   estFederalTax: number
   estNetProceeds: number
@@ -88,7 +98,6 @@ function buildConfirmData(
   let ltCapitalGains = 0
   let lossesHarvested = 0
   let estNetTax = 0
-  let effectiveRate = 0
   let optMode: 'tax-first' | 'balance-first' = optimizationPriority
   let accountingMethod: AccountingMethod = 'MinTax'
 
@@ -111,17 +120,21 @@ function buildConfirmData(
         gainLoss: stg !== 0 ? stg : ltg,
         gainLossPeriod: period,
         estTaxGross: fr.est_tax_gross,
+        stGainLoss: stg,
+        ltGainLoss: ltg,
       }
     })
     totalSaleAmount = r2(manualConfig.fund_results.reduce((s, f) => s + f.sell_amount, 0))
     stCapitalGains = r2(manualConfig.fund_results.reduce((s, f) => s + Math.max(0, f.est_st_gain_loss), 0))
     ltCapitalGains = r2(manualConfig.fund_results.reduce((s, f) => s + Math.max(0, f.est_lt_gain_loss), 0))
     lossesHarvested = r2(manualConfig.fund_results.reduce((s, f) => s + Math.min(0, f.est_st_gain_loss) + Math.min(0, f.est_lt_gain_loss), 0))
-    const netGain = Math.max(0, r2(stCapitalGains + ltCapitalGains + lossesHarvested))
-    const taxST = Math.min(netGain, stCapitalGains) * stRate
-    const taxLT = Math.max(0, netGain - Math.min(netGain, stCapitalGains)) * ltRate
-    estNetTax = r2(taxST + taxLT)
-    effectiveRate = totalSaleAmount > 0 ? r2((estNetTax / totalSaleAmount) * 100) : 0
+    // The same shared three-way branch (taxable_brokerage / traditional_IRA
+    // / roth_IRA) engine/index.ts's runOptimization() and
+    // scenarioBuilder.ts use — not a third hand-copied implementation. This
+    // used to be its own inline taxable-only calculation here, which meant
+    // it was never updated when Traditional IRA's ordinary-income tax was
+    // added to the engine (see DECISIONS.md's Manual mode IRA tax fix entry).
+    estNetTax = computeNetTax(manualConfig.fund_results, acct?.account_type, { st_rate: stRate, lt_rate: ltRate })
     accountingMethod = (manualConfig.fund_results[0]?.accounting_method as AccountingMethod) ?? 'MinTax'
   // Priority: current recommendation first (reflects the user's most recent calculation),
   // then saved scenario (only used when arriving from Scenario Analysis with no fresh rec).
@@ -140,6 +153,8 @@ function buildConfirmData(
         gainLoss: period === 'ST' ? stg : ltg,
         gainLossPeriod: period,
         estTaxGross: fr.est_tax_gross,
+        stGainLoss: stg,
+        ltGainLoss: ltg,
       }
     })
     totalSaleAmount = r2(rec.fund_results.reduce((s, f) => s + f.sell_amount, 0))
@@ -147,7 +162,6 @@ function buildConfirmData(
     ltCapitalGains = r2(rec.fund_results.reduce((s, f) => s + Math.max(0, f.est_lt_gain_loss), 0))
     lossesHarvested = r2(rec.fund_results.reduce((s, f) => s + Math.min(0, f.est_st_gain_loss) + Math.min(0, f.est_lt_gain_loss), 0))
     estNetTax = r2(rec.est_net_tax)
-    effectiveRate = totalSaleAmount > 0 ? r2((estNetTax / totalSaleAmount) * 100) : 0
     optMode = rec.optimization_priority ?? optimizationPriority
     accountingMethod = (rec.fund_results[0]?.accounting_method as AccountingMethod) ?? 'MinTax'
   } else if (scenario) {
@@ -163,6 +177,8 @@ function buildConfirmData(
         gainLoss: period === 'ST' ? stg : ltg,
         gainLossPeriod: period,
         estTaxGross: fs.est_tax_gross ?? 0,
+        stGainLoss: stg,
+        ltGainLoss: ltg,
       }
     })
     totalSaleAmount = scenario.total_sell_amount
@@ -170,7 +186,6 @@ function buildConfirmData(
     ltCapitalGains = r2(scenario.projected_lt_gains)
     lossesHarvested = r2(scenario.losses_harvested)
     estNetTax = r2(scenario.est_net_tax)
-    effectiveRate = scenario.total_sell_amount > 0 ? r2((estNetTax / scenario.total_sell_amount) * 100) : 0
     optMode = (scenario.optimization_priority as 'tax-first' | 'balance-first') ?? optimizationPriority
     accountingMethod = (scenario.fund_selections[0]?.accounting_method as AccountingMethod) ?? 'MinTax'
   } else {
@@ -183,7 +198,7 @@ function buildConfirmData(
   const estNetProceeds = r2(grossProceeds - estNetTax)
 
   return {
-    accountName: acct?.account_type === 'taxable_brokerage' ? 'Taxable Brokerage' : acct?.account_type ?? 'Taxable Brokerage',
+    accountName: accountTypeLabel(acct?.account_type),
     accountMasked: acct?.masked_number ?? '...4782',
     totalSaleAmount,
     funds,
@@ -193,7 +208,6 @@ function buildConfirmData(
     netTaxableGain,
     federalTax,
     estNetTax,
-    effectiveRate,
     grossProceeds,
     estFederalTax: estNetTax,
     estNetProceeds,
@@ -337,6 +351,7 @@ export default function OrderConfirmation() {
     mode,
     setPortfolio,
     clearManualSession,
+    demoSettings,
   } = useAppStore()
 
   // Resolve the best available data: first scenario, then recommendation
@@ -347,6 +362,10 @@ export default function OrderConfirmation() {
 
   // Same source precedence buildConfirmData uses above (manual > recommendation > scenario).
   const activeAccountType = portfolio?.accounts.find(a => a.account_id === activeAccountId)?.account_type ?? 'taxable_brokerage'
+
+  // IRA banner redesign — display/layout only, see accountBanner.ts. Reuses
+  // the same activeAccountType already established above for narration.
+  const showSeparateGainLoss = bannerShowSeparateGainLoss(activeAccountType)
   const narrationSource =
     mode === 'manual' && manualConfig && manualConfig.fund_results.length > 0
       ? { kind: 'manual' as const, data: manualConfig }
@@ -377,7 +396,12 @@ export default function OrderConfirmation() {
     const acctForFifo = portfolio.accounts.find(a => a.account_id === activeAccountId)
       ?? portfolio.accounts.find(a => a.account_type === 'taxable_brokerage')
     let fifoTax = 0
-    if (acctForFifo) {
+    // Comparing against a FIFO capital-gains baseline only means something for
+    // a taxable brokerage account — an IRA/Roth sale owes no capital-gains tax
+    // under any cost-basis method, so there is no "savings vs. FIFO" to claim.
+    // Found live (D057): this showed a fake "you saved $1,090.98" banner on a
+    // Roth IRA's Execution Summary once non-taxable accounts became reachable.
+    if (acctForFifo?.account_type === 'taxable_brokerage') {
       for (const f of d.funds) {
         const holding = acctForFifo.holdings.find(h => h.fund_id === f.id)
         if (!holding) continue
@@ -412,15 +436,25 @@ export default function OrderConfirmation() {
     const record: TransactionRecord = {
       transaction_id: `txn-${Date.now()}`,
       committed_timestamp: new Date().toISOString(),
+      account_id: acctForFifo?.account_id,
+      account_type: acctForFifo?.account_type,
       target_sale_amount: d.totalSaleAmount,
       actual_sale_proceeds: d.estNetProceeds,
+      // st_gain_loss/lt_gain_loss read directly from the real per-fund
+      // figures (added for the breakdown-expanders task) rather than
+      // reconstructed from gainLoss/gainLossPeriod, which only ever kept
+      // whichever period was picked first — silently dropping the other
+      // one for a fund with real nonzero gain/loss in both categories (a
+      // mixed-lot MinTax sale). A pre-existing data-loss bug in this
+      // mapping, fixed as a direct consequence of needing both figures
+      // correct for ExecutionSummary's own tax breakdown to be accurate.
       funds_sold: d.funds.map((f): TransactionFundRecord => ({
         fund_id: f.id,
         sell_amount: f.sellAmount,
         accounting_method: d.accountingMethod,
         lots_sold: [],
-        st_gain_loss: f.gainLossPeriod === 'ST' ? f.gainLoss : 0,
-        lt_gain_loss: f.gainLossPeriod === 'LT' ? f.gainLoss : 0,
+        st_gain_loss: f.stGainLoss,
+        lt_gain_loss: f.ltGainLoss,
       })),
       realized_st_gains: d.stCapitalGains,
       realized_lt_gains: d.ltCapitalGains,
@@ -428,6 +462,11 @@ export default function OrderConfirmation() {
       net_taxable_gain: d.netTaxableGain,
       est_tax_at_active_rate: d.estNetTax,
       effective_rate: d.totalSaleAmount > 0 ? r2((d.estNetTax / d.totalSaleAmount) * 100) : 0,
+      // The exact rates that produced est_tax_at_active_rate above — see
+      // TransactionRecord's own doc comment for why this is frozen at
+      // submission time rather than read fresh from the store later.
+      st_rate: stRate,
+      lt_rate: ltRate,
       cumulative_ytd_st_gains: r2((portfolio.ytd_gains_record?.st_gains_realized_ytd ?? 0) + d.stCapitalGains),
       cumulative_ytd_lt_gains: r2((portfolio.ytd_gains_record?.lt_gains_realized_ytd ?? 0) + d.ltCapitalGains + d.lossesHarvested),
       optimization_mode: d.optimizationMode,
@@ -489,11 +528,12 @@ export default function OrderConfirmation() {
               <div className="bg-white border border-[#e8e9e9] p-[16px] w-full">
                 <NarrationBlock
                   textClassName="text-[13px] text-[#040505] leading-normal"
+                  provider={demoSettings.narrationProvider ?? undefined}
                   input={buildOrderConfirmationNarrationInput({
                     source: narrationSource,
                     portfolio,
                     accountType: activeAccountType,
-                    segment: 'A',
+                    segment: demoSettings.narrationSegment,
                   })}
                 />
               </div>
@@ -526,7 +566,7 @@ export default function OrderConfirmation() {
               {/* Fund rows */}
               {data.funds.map((f) => {
                 const gainLossColor = f.gainLoss > 0 ? '#007a00' : f.gainLoss < 0 ? '#c8102e' : '#717777'
-                const taxColor = f.estTaxGross > 0 ? '#040505' : '#717777'
+                const taxColor = f.estTaxGross !== 'not_applicable' && f.estTaxGross > 0 ? '#040505' : '#717777'
                 return (
                   <div key={f.id} className="flex h-[40px] items-start w-full border border-[#f0f0f0]">
                     <div className="flex flex-1 min-w-0 flex-col gap-[2px] h-[40px] justify-center overflow-hidden">
@@ -548,8 +588,8 @@ export default function OrderConfirmation() {
                       </span>
                     </div>
                     <div className="w-[244px] h-[40px] flex items-center justify-end">
-                      <span className="text-[12px] whitespace-nowrap" style={{ color: taxColor, fontWeight: f.estTaxGross > 0 ? 700 : 400 }}>
-                        {formatCurrency(f.estTaxGross)}
+                      <span className="text-[12px] whitespace-nowrap" style={{ color: taxColor, fontWeight: f.estTaxGross !== 'not_applicable' && f.estTaxGross > 0 ? 700 : 400 }}>
+                        {formatTaxFigure(f.estTaxGross)}
                       </span>
                     </div>
                   </div>
@@ -576,15 +616,50 @@ export default function OrderConfirmation() {
               <div className="flex flex-1 flex-col items-start min-w-0">
                 <span className="text-[12px] font-semibold text-[#040505]">Estimated tax impact</span>
                 <div className="h-[8px]" />
-                <TaxRow label="ST Capital Gains" value={data.stCapitalGains !== 0 ? fmtGainLoss(data.stCapitalGains, '') : '$0.00'} valueBold valueColor={data.stCapitalGains > 0 ? '#007a00' : data.stCapitalGains < 0 ? '#c8102e' : '#717777'} />
-                <TaxRow label="LT Capital Gains" value={data.ltCapitalGains !== 0 ? fmtGainLoss(data.ltCapitalGains, '') : '$0.00'} valueColor={data.ltCapitalGains > 0 ? '#007a00' : data.ltCapitalGains < 0 ? '#c8102e' : '#717777'} />
-                <TaxRow label="Losses Harvested" value={data.lossesHarvested !== 0 ? fmtGainLoss(data.lossesHarvested, '') : '$0.00'} valueBold={data.lossesHarvested !== 0} valueColor={data.lossesHarvested < 0 ? '#c8102e' : data.lossesHarvested > 0 ? '#007a00' : '#717777'} />
+                {showSeparateGainLoss ? (
+                  <>
+                    <TaxRow label="ST Capital Gains" value={data.stCapitalGains !== 0 ? fmtGainLoss(data.stCapitalGains, '') : '$0.00'} valueBold valueColor={data.stCapitalGains > 0 ? '#007a00' : data.stCapitalGains < 0 ? '#c8102e' : '#717777'} />
+                    <TaxRow label="LT Capital Gains" value={data.ltCapitalGains !== 0 ? fmtGainLoss(data.ltCapitalGains, '') : '$0.00'} valueColor={data.ltCapitalGains > 0 ? '#007a00' : data.ltCapitalGains < 0 ? '#c8102e' : '#717777'} />
+                    <TaxRow label="Losses Harvested" value={data.lossesHarvested !== 0 ? fmtGainLoss(data.lossesHarvested, '') : '$0.00'} valueBold={data.lossesHarvested !== 0} valueColor={data.lossesHarvested < 0 ? '#c8102e' : data.lossesHarvested > 0 ? '#007a00' : '#717777'} />
+                    <Divider />
+                    <TaxRow label="Net Taxable Gain" value={formatCurrency(data.netTaxableGain)} valueBold />
+                  </>
+                ) : (
+                  // IRA banner redesign (display/layout only) — the ST/LT/
+                  // Losses/Net-Taxable-Gain cluster above consolidates into
+                  // one informational figure for either IRA type. Rule 1
+                  // (CLAUDE.md §13) still governs its color.
+                  <TaxRow
+                    label={CONSOLIDATED_GAIN_LOSS_LABEL_TITLECASE}
+                    value={data.netTaxableGain !== 0 ? fmtGainLoss(data.netTaxableGain, '') : '$0.00'}
+                    valueBold
+                    valueColor={data.netTaxableGain > 0 ? '#007a00' : data.netTaxableGain < 0 ? '#c8102e' : '#717777'}
+                  />
+                )}
+                <TaxRow label={bannerRelabelForIra(activeAccountType, 'Federal Tax (estimated)', 'Ordinary Income Tax (estimated)')} value={formatCurrency(data.federalTax)} />
                 <Divider />
-                <TaxRow label="Net Taxable Gain" value={formatCurrency(data.netTaxableGain)} valueBold />
-                <TaxRow label="Federal Tax (estimated)" value={formatCurrency(data.federalTax)} />
-                <Divider />
-                <TaxRow label="EST. NET TAX" value={formatCurrency(data.estNetTax)} labelBold valueBold valueLg />
-                <TaxRow label="Effective rate" value={fmtRate2(data.effectiveRate)} muted />
+                <TaxRow label={bannerRelabelForIra(activeAccountType, 'EST. NET TAX', 'EST. ORDINARY INCOME TAX')} value={formatCurrency(data.estNetTax)} labelBold valueBold valueLg />
+                <div className="flex items-center justify-end w-full pt-[2px]">
+                  <ExpandableDetail label="Breakdown">
+                    <TaxBreakdownPanel
+                      accountType={activeAccountType}
+                      funds={data.funds.map(f => ({ est_st_gain_loss: f.stGainLoss, est_lt_gain_loss: f.ltGainLoss, sell_amount: f.sellAmount }))}
+                      taxRates={activeTaxRates ?? { st_rate: 0.24, lt_rate: 0.15 }}
+                      saleTotal={data.totalSaleAmount}
+                    />
+                  </ExpandableDetail>
+                </div>
+                {bannerShowEarlyWithdrawalPenalty(activeAccountType) && (
+                  <>
+                    <Divider />
+                    <TaxRow label="Early withdrawal penalty" value="N/A" muted />
+                    <div className="flex items-center justify-end w-full pt-[2px]">
+                      <ExpandableDetail label="Why?">
+                        <p className="text-[11.5px] text-vg-ink-muted leading-relaxed">{EARLY_WITHDRAWAL_PENALTY_NOTE}</p>
+                      </ExpandableDetail>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Estimated proceeds (220px) */}
@@ -592,7 +667,7 @@ export default function OrderConfirmation() {
                 <span className="text-[12px] font-semibold text-[#040505]">Estimated proceeds</span>
                 <div className="h-[8px]" />
                 <TaxRow label="Gross proceeds" value={formatCurrency(data.grossProceeds)} />
-                <TaxRow label="Est. federal tax" value={data.estFederalTax > 0 ? '−' + formatCurrency(data.estFederalTax) : formatCurrency(0)} valueColor={data.estFederalTax > 0 ? '#c8102e' : '#717777'} />
+                <TaxRow label={bannerRelabelForIra(activeAccountType, 'Est. federal tax', 'Est. ordinary income tax')} value={data.estFederalTax > 0 ? '−' + formatCurrency(data.estFederalTax) : formatCurrency(0)} valueColor={data.estFederalTax > 0 ? '#c8102e' : '#717777'} />
                 <Divider />
                 <TaxRow label="Est. net proceeds" value={formatCurrency(data.estNetProceeds)} labelBold valueBold valueLg />
               </div>
@@ -603,7 +678,7 @@ export default function OrderConfirmation() {
               <div className="flex flex-1 flex-col gap-[4px] items-start min-w-0">
                 <span className="text-[10px] font-semibold text-[#717777] uppercase leading-3">DESTINATION</span>
                 <span className="text-[13px] font-normal text-[#040505] leading-4">Settlement fund</span>
-                <span className="text-[13px] font-bold text-[#040505] leading-4">Brokerage {data.accountMasked}</span>
+                <span className="text-[13px] font-bold text-[#040505] leading-4">{data.accountName} {data.accountMasked}</span>
               </div>
               <div className="flex flex-1 flex-col gap-[4px] items-start min-w-0">
                 <span className="text-[10px] font-semibold text-[#717777] uppercase leading-3">ESTIMATED SETTLEMENT</span>

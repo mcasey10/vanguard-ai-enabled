@@ -226,6 +226,16 @@ export interface LotSaleDetail {
   holding_period: 'LT' | 'ST'
 }
 
+// A tax-relevant figure that may genuinely not be computable at the level
+// being displayed — distinct from a literal 0, which means "computed, none
+// owed." 'not_applicable' means "this calculation doesn't apply here" (e.g.
+// per-fund gross tax for an IRA holding, where ordinary-income tax is only
+// meaningful at the portfolio/withdrawal level, not per fund). See
+// DECISIONS.md's IRA ordinary-income tax entry. Use taxFigureToNumber()/
+// formatTaxFigure() (utils/format.ts) at any boundary that needs a plain
+// number or a display string.
+export type TaxFigureOrNA = number | 'not_applicable'
+
 export interface FundSaleResult {
   fund_id: string
   fund_name: string
@@ -234,7 +244,7 @@ export interface FundSaleResult {
   lots_sold: LotSaleDetail[]
   est_st_gain_loss: number
   est_lt_gain_loss: number
-  est_tax_gross: number   // per-fund gross tax before netting (EST. TAX per CLAUDE.md constraint 3)
+  est_tax_gross: TaxFigureOrNA   // per-fund gross tax before netting (EST. TAX per CLAUDE.md constraint 3) — 'not_applicable' for IRA holdings, not $0
   impact_pct: number      // signed delta to portfolio asset class allocation
   impact_asset_class: string
   rationale: string
@@ -266,6 +276,19 @@ export interface Recommendation {
   optimization_priority: 'tax-first' | 'balance-first'
   fund_results: FundSaleResult[]
   est_net_tax: number          // portfolio-level netting (EST. NET TAX per CLAUDE.md constraint 3)
+  // Groundwork only — no UI surfaces this field yet, and no penalty
+  // calculation is performed (that's a follow-up task). Always
+  // 'not_applicable' for this dataset's investor: see
+  // sample-dataset.json's note_retirement_status — the 10% early-withdrawal
+  // penalty applies only to distributions taken before age 59½, and this
+  // investor is 73. Distinguished from a literal $0, which would wrongly
+  // imply "calculated, no penalty owed" rather than "this calculation
+  // doesn't apply to this investor." Placed on Recommendation (not
+  // FundSaleResult) because an early-withdrawal penalty, like ordinary
+  // income tax, is a portfolio/withdrawal-level concept, not a per-fund
+  // one — Manual mode's ManualConfiguration doesn't carry an equivalent
+  // field yet since it has no portfolio-level tax figure at all today.
+  est_early_withdrawal_penalty: TaxFigureOrNA
   effective_rate: number
   allocation_impact: AllocationImpact
   plain_language_rationale: string
@@ -283,7 +306,7 @@ export interface ScenarioFundSelection {
   lots_selected: LotSaleDetail[]  // empty unless SpecID
   st_gain_loss?: number            // per-fund net ST gain (+) or loss (−); set on save
   lt_gain_loss?: number            // per-fund net LT gain (+) or loss (−); set on save
-  est_tax_gross?: number           // per-fund gross tax (before portfolio netting); set on save
+  est_tax_gross?: TaxFigureOrNA    // per-fund gross tax (before portfolio netting); set on save — 'not_applicable' for IRA holdings, not $0
 }
 
 export interface SavedScenario {
@@ -291,6 +314,17 @@ export interface SavedScenario {
   scenario_name: string
   source_mode: 'automated' | 'manual'
   optimization_priority?: 'tax-first' | 'balance-first'  // only set for automated scenarios
+  // CD-1.2 disclosure: true when the what-if assistant (Feature 2) constructed
+  // or modified this scenario, independent of source_mode — see CLAUDE.md §3/§8.
+  ai_assisted?: boolean
+  // Which account this scenario was built against — added when account
+  // switching was enabled (D057); every scenario builder call site now sets
+  // this from the active account at build time. Optional because scenarios
+  // created before this field existed (e.g. the seeded canonical demo
+  // scenarios) don't carry it — those are always taxable_brokerage, so
+  // callers reading this field should fall back to 'taxable_brokerage'.
+  account_id?: string
+  account_type?: AccountType
   fund_selections: ScenarioFundSelection[]
   total_sell_amount: number        // sum of all fund sell_amounts
   projected_st_gains: number       // net positive ST gains
@@ -344,6 +378,12 @@ export interface TransactionFundRecord {
 export interface TransactionRecord {
   transaction_id: string
   committed_timestamp: string
+  // Which account this transaction was executed against — added when account
+  // switching was enabled (D057), same gap as SavedScenario had (D039) before
+  // it was fixed. Optional because it didn't exist before this; every real
+  // transaction going forward sets it.
+  account_id?: string
+  account_type?: AccountType
   target_sale_amount: number
   actual_sale_proceeds: number
   funds_sold: TransactionFundRecord[]
@@ -353,6 +393,15 @@ export interface TransactionRecord {
   net_taxable_gain: number     // realized_st_gains + realized_lt_gains + losses_harvested
   est_tax_at_active_rate: number
   effective_rate: number       // est_tax / target_sale_amount
+  // The real st_rate/lt_rate active at submission time — added for the
+  // breakdown-expanders task so ExecutionSummary's "Breakdown ▾" panel can
+  // recompute against the EXACT rates that produced est_tax_at_active_rate,
+  // not whatever activeTaxRates happens to be at view time (which could have
+  // changed via the tax bracket dialog between submission and viewing the
+  // receipt). Optional because it didn't exist before this; a pre-existing
+  // transaction record falls back to this app's default rates (24%/15%).
+  st_rate?: number
+  lt_rate?: number
   cumulative_ytd_st_gains: number
   cumulative_ytd_lt_gains: number
   optimization_mode: 'tax-first' | 'balance-first'

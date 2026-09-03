@@ -1,10 +1,21 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Sparkles } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import type { SavedScenario, Portfolio } from '../types'
-import { formatCurrency, formatCurrencyCompact, formatPercent } from '../utils/format'
+import type { DemoSettings } from '../utils/demoSettings'
+import { formatCurrency, formatCurrencyCompact, formatPercent, accountTypeLabel, resolveScenarioAccount } from '../utils/format'
 import { NarrationBlock } from '../components/NarrationBlock'
 import { buildScenarioNarrationInput } from '../utils/narrationBuilders'
+import { WhatIfPanel } from '../components/WhatIfPanel'
+import { TaxBracketDialog } from '../components/TaxBracketDialog'
+import { ExpandableDetail } from '../components/ExpandableDetail'
+import { TaxBreakdownPanel } from '../components/TaxBreakdownPanel'
+import {
+  bannerRateDisplay, bannerShowYtdRealized, bannerShowSeparateGainLoss, CONSOLIDATED_GAIN_LOSS_LABEL_TITLECASE,
+  bannerRelabelForIra, bannerShowEarlyWithdrawalPenalty,
+  EARLY_WITHDRAWAL_PENALTY_NOTE,
+} from '../utils/accountBanner'
 
 // ---------------------------------------------------------------------------
 // Seed canonical scenarios for prototype demo (VT8 + VT9 variations)
@@ -248,13 +259,14 @@ interface ScenarioColumnProps {
   index: number
   portfolio: Portfolio | null
   activeTaxRates: { st_rate: number; lt_rate: number }
+  demoSettings: DemoSettings
   onEdit: () => void
   onReviewOrder: () => void
   onDuplicate: () => void
   onDelete: () => void
 }
 
-function ScenarioColumn({ scenario, index, portfolio, activeTaxRates, onEdit, onReviewOrder, onDuplicate, onDelete }: ScenarioColumnProps) {
+function ScenarioColumn({ scenario, index, portfolio, activeTaxRates, demoSettings, onEdit, onReviewOrder, onDuplicate, onDelete }: ScenarioColumnProps) {
   const ai = scenario.allocation_impact
   // AllocationImpact stores values in percentage format (0–100). Combine domestic+international for Stocks.
   const stocksBefore   = r2(ai.domestic_equity_before  + ai.international_equity_before)
@@ -284,30 +296,60 @@ function ScenarioColumn({ scenario, index, portfolio, activeTaxRates, onEdit, on
   )
   // Use stored value — in prototype rates are fixed so this is stable
   const displayFederalTax = scenario.est_net_tax
-  const effRatePct = scenario.total_sell_amount > 0
-    ? r2((displayFederalTax / scenario.total_sell_amount) * 100)
-    : r2(scenario.effective_rate * 100)
-  const displayEffRate = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(effRatePct) + '%'
   void federalTax
 
   const isSystemRec = scenario.source_mode === 'automated'
+
+  // Which real account this scenario belongs to — shown per-scenario now
+  // (D067, item 1), not just at the page-level "ACCOUNT FOR NEW SCENARIOS"
+  // label, which only ever describes what a *new* scenario would use and
+  // says nothing about an existing one. Confirmed live (D067's Tier 3) that
+  // scenarios can genuinely span different accounts, so this label is load-
+  // bearing, not decorative — without it, a scenario built against a
+  // different account than whichever one is currently active is silently
+  // misattributed to the wrong account by the page-level label alone.
+  const scenarioAccount = portfolio ? resolveScenarioAccount(scenario, portfolio) : undefined
+
+  // IRA banner redesign — display/layout only, see accountBanner.ts.
+  const showSeparateGainLoss = bannerShowSeparateGainLoss(scenarioAccount?.account_type)
 
   return (
     <div className="bg-white border border-[#e8e9e9] flex flex-col flex-1 rounded-[8px] overflow-hidden min-w-0">
       {/* SecA — scenario header */}
       <div className="bg-[#f8f8f8] border-b border-[#e8e9e9] flex items-center justify-between px-[16px] py-[12px] shrink-0">
-        <span className="text-[10px] font-semibold text-[#717777]">SCENARIO {index + 1}</span>
-        <div className="flex items-center gap-[8px]">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-[10px] font-semibold text-[#717777]">SCENARIO {index + 1}</span>
+          {scenarioAccount && (
+            <span className="text-[11px] font-semibold text-vg-ink truncate">
+              {accountTypeLabel(scenarioAccount.account_type)} {scenarioAccount.masked_number}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-[8px] shrink-0">
           {isSystemRec && (
             <div className="bg-[#e1f5ee] px-[10px] py-[4px] rounded-[100px]">
-              <span className="text-[11px] font-semibold text-[#085041] whitespace-nowrap">
-                System recommendation — {scenario.optimization_priority === 'balance-first' ? 'Balance-first' : 'Tax-first'} optimized
+              <span className="text-[11px] font-semibold whitespace-nowrap">
+                {/* Two-tone badge text (D064): "AI-assisted" prefix in the
+                    same purple as the CD-1.2 "AI-generated" narration badge
+                    (NarrationBlock.tsx, #6b21a8) — reusing the app's one
+                    existing AI-disclosure color rather than inventing a
+                    second one — while the pill's own background (teal here,
+                    gray in the Custom variant below) still carries the
+                    System-recommendation/Custom distinction unchanged. */}
+                {scenario.ai_assisted && <span className="text-[#6b21a8]">AI-assisted — </span>}
+                {!scenario.ai_assisted && <span className="text-[#085041]">System recommendation — </span>}
+                <span className="text-[#085041]">
+                  {scenario.optimization_priority === 'balance-first' ? 'Balance-first' : 'Tax-first'} optimized
+                </span>
               </span>
             </div>
           )}
           {!isSystemRec && (
             <div className="bg-[#e8e9e9] px-[10px] py-[4px] rounded-[100px]">
-              <span className="text-[11px] font-semibold text-[#717777] whitespace-nowrap">Custom</span>
+              <span className="text-[11px] font-semibold whitespace-nowrap">
+                {scenario.ai_assisted && <span className="text-[#6b21a8]">AI-assisted — </span>}
+                <span className="text-[#717777]">Custom</span>
+              </span>
             </div>
           )}
           <KebabMenu onDuplicate={onDuplicate} onDelete={onDelete} />
@@ -346,28 +388,71 @@ function ScenarioColumn({ scenario, index, portfolio, activeTaxRates, onEdit, on
               <span className={`text-[12px] font-bold text-right w-[68px] shrink-0 whitespace-nowrap ${ltColor}`}>
                 {ltg !== 0 ? fmtGainCompact(ltg) : <span className="text-[#717777] font-normal">{formatCurrencyCompact(0)}</span>}
               </span>
-              <span className={`text-[12px] text-right w-[64px] shrink-0 whitespace-nowrap ${etx > 0 ? 'font-bold text-[#040505]' : 'text-[#717777]'}`}>
-                {etx > 0 ? formatCurrencyCompact(etx) : formatCurrencyCompact(0)}
+              <span className={`text-[12px] text-right w-[64px] shrink-0 whitespace-nowrap ${etx !== 'not_applicable' && etx > 0 ? 'font-bold text-[#040505]' : 'text-[#717777]'}`}>
+                {etx === 'not_applicable' ? 'N/A' : etx > 0 ? formatCurrencyCompact(etx) : formatCurrencyCompact(0)}
               </span>
             </div>
           )
         })}
       </div>
 
-      {/* SecC — tax summary */}
+      {/* SecC — tax summary. IRA banner redesign (display/layout only, see
+          accountBanner.ts): ST/LT Capital Gains + Losses Harvested + Net
+          Taxable Gain (all capital-gains-specific concepts) consolidate
+          into one informational "Est. gain/loss (no tax impact)" row for
+          either IRA type — Traditional IRA's withdrawal is taxed as
+          ordinary income on the total, never netted against gain/loss;
+          Roth IRA's is tax-free regardless. Rule 1 (CLAUDE.md §13) governs
+          this row's color exactly as it already governs the rows it
+          replaces — read from the real register, not reconstructed. */}
       <div className="bg-white border-b border-[#e8e9e9] flex flex-col p-[16px] shrink-0">
         <span className="text-[12px] font-semibold text-[#040505] pb-[8px]">Tax summary</span>
 
-        <TaxRow label="ST Capital Gains"  value={scenario.projected_st_gains}  isGain valueColor={scenario.projected_st_gains > 0 ? '#007a00' : undefined} />
-        <TaxRow label="LT Capital Gains"  value={scenario.projected_lt_gains}  isGain valueColor={scenario.projected_lt_gains > 0 ? '#007a00' : undefined} />
-        <TaxRow label="Losses Harvested"  value={scenario.losses_harvested}    signed valueColor={scenario.losses_harvested < 0 ? '#c8102e' : undefined} />
-        <div className="bg-[#e8e9e9] h-px w-full my-0" />
-        <TaxRow label="Net Taxable Gain"  value={scenario.net_taxable_gain}    bold />
-        <TaxRow label="Federal Tax"       value={displayFederalTax} />
+        {showSeparateGainLoss ? (
+          <>
+            <TaxRow label="ST Capital Gains"  value={scenario.projected_st_gains}  isGain valueColor={scenario.projected_st_gains > 0 ? '#007a00' : undefined} />
+            <TaxRow label="LT Capital Gains"  value={scenario.projected_lt_gains}  isGain valueColor={scenario.projected_lt_gains > 0 ? '#007a00' : undefined} />
+            <TaxRow label="Losses Harvested"  value={scenario.losses_harvested}    signed valueColor={scenario.losses_harvested < 0 ? '#c8102e' : undefined} />
+            <div className="bg-[#e8e9e9] h-px w-full my-0" />
+            <TaxRow label="Net Taxable Gain"  value={scenario.net_taxable_gain}    bold />
+          </>
+        ) : (
+          <TaxRow
+            label={CONSOLIDATED_GAIN_LOSS_LABEL_TITLECASE}
+            value={scenario.net_taxable_gain}
+            signed
+            valueColor={scenario.net_taxable_gain > 0 ? '#007a00' : scenario.net_taxable_gain < 0 ? '#c8102e' : '#717777'}
+          />
+        )}
+        <TaxRow label={bannerRelabelForIra(scenarioAccount?.account_type, 'Federal Tax', 'Ordinary Income Tax')} value={displayFederalTax} />
         <TaxRow label="State Tax"         value={0} muted />
         <div className="bg-[#e8e9e9] h-px w-full my-0" />
-        <TaxRow label="Est. Total Tax"    value={displayFederalTax} labelBold valueBold valueLg />
-        <TaxRow label="Effective Rate"    displayText={displayEffRate} muted />
+        <TaxRow label={bannerRelabelForIra(scenarioAccount?.account_type, 'Est. Total Tax', 'Est. Ordinary Income Tax')} value={displayFederalTax} labelBold valueBold valueLg />
+        <div className="flex items-center justify-end pt-[2px]">
+          <ExpandableDetail label="Breakdown">
+            <TaxBreakdownPanel
+              accountType={scenarioAccount?.account_type}
+              funds={scenario.fund_selections.map(fs => ({
+                est_st_gain_loss: fs.st_gain_loss ?? 0,
+                est_lt_gain_loss: fs.lt_gain_loss ?? 0,
+                sell_amount: fs.sell_amount,
+              }))}
+              taxRates={activeTaxRates}
+              saleTotal={scenario.total_sell_amount}
+            />
+          </ExpandableDetail>
+        </div>
+        {bannerShowEarlyWithdrawalPenalty(scenarioAccount?.account_type) && (
+          <>
+            <div className="bg-[#e8e9e9] h-px w-full my-0" />
+            <TaxRow label="Early Withdrawal Penalty" displayText="N/A" muted />
+            <div className="flex items-center justify-end pt-[2px]">
+              <ExpandableDetail label="Why?">
+                <p className="text-[11.5px] text-vg-ink-muted leading-relaxed">{EARLY_WITHDRAWAL_PENALTY_NOTE}</p>
+              </ExpandableDetail>
+            </div>
+          </>
+        )}
       </div>
 
       {/* SecD — asset mix impact */}
@@ -427,29 +512,36 @@ function ScenarioColumn({ scenario, index, portfolio, activeTaxRates, onEdit, on
         {portfolio
           ? <NarrationBlock
               textClassName="text-[13px] text-[#040505] leading-normal"
+              provider={demoSettings.narrationProvider ?? undefined}
               input={buildScenarioNarrationInput({
                 scenario,
                 portfolio,
-                // SavedScenario doesn't track which account it was built
-                // against; scenarios are single-account (built from a
-                // single-account Recommendation/ManualConfiguration — see
-                // OptimizationParams.activeAccountId), and every scenario in
-                // this build is against the taxable account. See DECISIONS.md.
-                accountType: 'taxable_brokerage',
-                segment: 'A',
+                // SavedScenario.account_type is set by every scenario builder
+                // call site as of D057 (account switching). Falls back to
+                // taxable_brokerage only for scenarios saved before that field
+                // existed — the seeded canonical demo scenarios, which are
+                // genuinely taxable-only, are the only real case of this.
+                accountType: scenario.account_type ?? 'taxable_brokerage',
+                segment: demoSettings.narrationSegment,
               })}
             />
           : <p className="text-[13px] text-[#040505] leading-normal">{scenario.tradeoff_summary}</p>}
       </div>
 
-      {/* SecF — action buttons */}
-      <div className="bg-white flex items-center justify-end gap-[24px] px-[16px] py-[12px] shrink-0">
-        <button onClick={onEdit} className="h-[48px] w-[180px] rounded-full border-[1.5px] border-vg-ink bg-white text-[14px] font-bold text-vg-ink shrink-0 hover:opacity-90 transition-opacity">
-          Edit scenario →
-        </button>
-        <button onClick={onReviewOrder} className="h-[48px] w-[180px] rounded-full bg-vg-ink text-white text-[14px] font-bold shrink-0 hover:opacity-90 transition-opacity">
-          Review order
-        </button>
+      {/* SecF — action buttons. The per-scenario "Modify with Scenario
+          assistant" link (D064, renamed D066) is gone as of D067 — the
+          header-level "Scenario assistant" button is now the single launch
+          point, with an in-panel segmented control for targeting a specific
+          scenario instead. "Edit scenario →" remains the manual round trip. */}
+      <div className="bg-white flex flex-col items-end gap-[8px] px-[16px] py-[12px] shrink-0">
+        <div className="flex items-center justify-end gap-[24px] w-full">
+          <button onClick={onEdit} className="h-[48px] w-[180px] rounded-full border-[1.5px] border-vg-ink bg-white text-[14px] font-bold text-vg-ink shrink-0 hover:opacity-90 transition-opacity">
+            Edit scenario →
+          </button>
+          <button onClick={onReviewOrder} className="h-[48px] w-[180px] rounded-full bg-vg-ink text-white text-[14px] font-bold shrink-0 hover:opacity-90 transition-opacity">
+            Review order
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -497,14 +589,50 @@ function TaxRow({ label, value, displayText, signed, isGain, bold, labelBold, va
 
 export default function ScenarioAnalysis() {
   const navigate = useNavigate()
-  const { scenarios, portfolio, activeTaxRates, setScenarios, addScenario, deleteScenario,
-    startEditingScenario, startNewScenario, activeScenarioId } = useAppStore()
+  const location = useLocation()
+  const { scenarios, portfolio, activeAccountId, activeTaxRates, addScenario, updateScenario, deleteScenario,
+    seedScenariosOnce, startEditingScenario, startNewScenario, activeScenarioId, demoSettings } = useAppStore()
 
-  // Seed canonical scenarios on mount when store is empty AND we're not mid-edit.
-  // The activeScenarioId check ensures a returning edit session isn't overwritten.
+  // Arriving from Fund Selection's own "nothing specified yet" entry point
+  // (FundSelectionAutomated.tsx/FundSelectionManual2.tsx) opens this panel
+  // immediately, already on "New" — same panel, same default, exactly as if
+  // the user had clicked this page's own "Scenario assistant" button
+  // directly (that button, below, is untouched and still always visible).
+  // Read once via useState's lazy initializer, not on every render — this is
+  // a one-time arrival signal, not a value this page should keep reacting to
+  // (the user can freely close the panel afterward without it reopening).
+  const locationState = location.state as { openAssistant?: boolean } | null
+  const [assistantOpen, setAssistantOpen] = useState(() => !!locationState?.openAssistant)
+  const [taxBracketOpen, setTaxBracketOpen] = useState(false)
+
+  // Which account governs a NEW scenario built through the assistant or
+  // "Add scenario" — this page's own scenario comparison is account-agnostic
+  // by design (D061: each saved scenario carries its own account_id/type),
+  // but nothing surfaced which account is *currently* active, making an
+  // account-restriction message from the assistant (e.g. a SpecID refusal on
+  // a Traditional IRA) ambiguous — the reader had no way to see which
+  // account that referred to without leaving this page.
+  const activeAccount = portfolio?.accounts.find(a => a.account_id === activeAccountId)
+
+  // IRA banner redesign — display/layout only, see accountBanner.ts. Governs
+  // the page-level "for new scenarios" tax strip; each ScenarioColumn makes
+  // its own equivalent decision from its own scenario's real account below.
+  const topRateDisplay = bannerRateDisplay(activeAccount?.account_type, activeTaxRates)
+  const showTopYtd = bannerShowYtdRealized(activeAccount?.account_type)
+
+  // Seed canonical scenarios on mount, but only the first time this session
+  // (D106) — `scenariosSeeded` (useAppStore.ts), not `scenarios.length === 0`
+  // on its own, is what actually gates this now. `scenarios.length === 0` is
+  // also true after a user has explicitly deleted every scenario, and this
+  // effect re-runs on every fresh mount of this route (any navigation to
+  // /scenarios unmounts and remounts the page) — the old length-only check
+  // silently re-seeded the 3 canonical demo scenarios any time a user
+  // returned to an empty comparison, overriding their own deletion (D106).
+  // The activeScenarioId check is kept for the same original reason (a
+  // returning edit session's in-progress scenarios shouldn't be seeded over).
   useEffect(() => {
-    if (scenarios.length === 0 && activeScenarioId === null) {
-      setScenarios(seedCanonicalScenarios(portfolio))
+    if (activeScenarioId === null) {
+      seedScenariosOnce(seedCanonicalScenarios(portfolio))
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -542,27 +670,53 @@ export default function ScenarioAnalysis() {
       <div className="flex flex-col items-start w-full">
         <div className="flex flex-col w-full">
 
-          {/* Page title — "Scenario Analysis", no mode toggle */}
-          <div className="bg-white flex items-center px-[32px] h-[56px] w-full">
+          {/* Page title — "Scenario Analysis", no mode toggle. The Scenario
+              assistant trigger lives here (D066, relocated from the "Add
+              scenario" slot) — a real IA fix, not cosmetic: header placement
+              is discoverable without hovering over an easy-to-miss link,
+              doesn't visually imply the assistant only *adds* scenarios (it
+              modifies existing ones too, D064), and won't need a second
+              relocation once multi-scenario exploration is built. Always
+              visible regardless of the 3-scenario cap — handleConfirm's
+              existing cap check (below) is what actually prevents a 4th
+              scenario, not hiding the trigger. */}
+          <div className="bg-white flex items-center justify-between px-[32px] h-[56px] w-full">
             <h1 className="text-[30px] font-bold text-vg-ink whitespace-nowrap leading-normal">Scenario Analysis</h1>
+            <button
+              onClick={() => setAssistantOpen(true)}
+              className="flex items-center gap-2 h-[40px] px-4 rounded-full bg-vg-teal text-white text-[14px] font-bold hover:opacity-90 transition-opacity shrink-0"
+            >
+              <Sparkles size={16} className="text-white" />
+              Scenario assistant
+            </button>
           </div>
 
           {/* Row 2 — Tax strip: bracket, YTD, disclaimer */}
           <div className="bg-[#f8f8f7] border border-[#e8e9e9] flex items-center justify-between px-[32px] py-[12px] w-full">
             <div className="flex gap-[24px] items-center">
               <div className="flex gap-[6px] items-center">
-                <span className="text-[10px] font-semibold text-[#717777]">TAX BRACKET</span>
-                <span className="text-[13px] text-vg-ink">
-                  {Math.round(activeTaxRates.st_rate * 100)}% ST / {Math.round(activeTaxRates.lt_rate * 100)}% LT
-                </span>
-                <a className="text-[12px] text-[#1255cc] underline cursor-pointer">Change</a>
+                <span className="text-[10px] font-semibold text-[#717777]">{topRateDisplay.label}</span>
+                <span className="text-[13px] text-vg-ink">{topRateDisplay.value}</span>
+                {topRateDisplay.changeable && (
+                  <a onClick={() => setTaxBracketOpen(true)} className="text-[12px] text-[#1255cc] underline cursor-pointer">Change</a>
+                )}
               </div>
-              <div className="flex gap-[6px] items-center">
-                <span className="text-[10px] font-semibold text-[#717777]">YTD REALIZED</span>
-                <span className="text-[13px] text-vg-ink">
-                  ST {formatCurrencyCompact(portfolio?.ytd_gains_record?.st_gains_realized_ytd ?? 1245)} / LT {formatCurrencyCompact(portfolio?.ytd_gains_record?.lt_gains_realized_ytd ?? 8750)}
-                </span>
-              </div>
+              {showTopYtd && (
+                <div className="flex gap-[6px] items-center">
+                  <span className="text-[10px] font-semibold text-[#717777]">YTD REALIZED</span>
+                  <span className="text-[13px] text-vg-ink">
+                    ST {formatCurrencyCompact(portfolio?.ytd_gains_record?.st_gains_realized_ytd ?? 1245)} / LT {formatCurrencyCompact(portfolio?.ytd_gains_record?.lt_gains_realized_ytd ?? 8750)}
+                  </span>
+                </div>
+              )}
+              {activeAccount && (
+                <div className="flex gap-[6px] items-center">
+                  <span className="text-[10px] font-semibold text-[#717777]">ACCOUNT FOR NEW SCENARIOS</span>
+                  <span className="text-[13px] text-vg-ink">
+                    {accountTypeLabel(activeAccount.account_type)} {activeAccount.masked_number}
+                  </span>
+                </div>
+              )}
             </div>
             <span className="text-[11px] text-[#717777]">Federal rates only · consult a tax professional</span>
           </div>
@@ -588,6 +742,7 @@ export default function ScenarioAnalysis() {
                     index={i}
                     portfolio={portfolio}
                     activeTaxRates={activeTaxRates}
+                    demoSettings={demoSettings}
                     onEdit={() => {
                       startEditingScenario(scenario)
                       navigate(scenario.source_mode === 'automated' ? '/automated' : '/manual-2')
@@ -598,14 +753,20 @@ export default function ScenarioAnalysis() {
                   />
                 ))}
 
-                {/* Add Scenario placeholder (hidden when 3 scenarios) */}
+                {/* Add Scenario placeholder (hidden when 3 scenarios) — the
+                    manual navigation path (D007). The assistant's own entry
+                    point used to live in this slot too (D006) but moved to
+                    the page header in D066 — this box is now the manual
+                    path only, not a dual-entry slot. */}
                 {showAdd && (
-                  <div
-                    onClick={() => { startNewScenario(); navigate('/') }}
-                    className="bg-white border border-dashed border-[#b8c0c0] rounded-[8px] flex flex-col items-center justify-center gap-[8px] px-[12px] py-[24px] text-[#717777] cursor-pointer hover:bg-[#f8f8f8] transition-colors w-[160px] shrink-0 self-stretch"
-                  >
-                    <span className="text-[24px]">+</span>
-                    <span className="text-[12px]">Add scenario</span>
+                  <div className="bg-white border border-dashed border-[#b8c0c0] rounded-[8px] flex flex-col items-center justify-center gap-[8px] px-[12px] py-[24px] w-[160px] shrink-0 self-stretch">
+                    <div
+                      onClick={() => { startNewScenario(); navigate('/') }}
+                      className="flex flex-col items-center gap-[8px] text-[#717777] cursor-pointer hover:opacity-70 transition-opacity"
+                    >
+                      <span className="text-[24px]">+</span>
+                      <span className="text-[12px]">Add scenario</span>
+                    </div>
                   </div>
                 )}
               </>
@@ -614,6 +775,23 @@ export default function ScenarioAnalysis() {
 
         </div>
       </div>
+
+      {assistantOpen && portfolio && (
+        <WhatIfPanel
+          onClose={() => setAssistantOpen(false)}
+          portfolio={portfolio}
+          activeAccountId={activeAccountId}
+          activeTaxRates={activeTaxRates}
+          scenarios={scenarios}
+          scenarioCount={scenarios.length}
+          onScenarioAdded={scenario => addScenario(scenario)}
+          onScenarioUpdated={(id, scenario) => updateScenario(id, scenario)}
+          segment={demoSettings.narrationSegment}
+          provider={demoSettings.whatifProvider ?? undefined}
+        />
+      )}
+
+      {taxBracketOpen && <TaxBracketDialog onClose={() => setTaxBracketOpen(false)} />}
     </>
   )
 }

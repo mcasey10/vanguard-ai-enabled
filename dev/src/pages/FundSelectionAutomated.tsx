@@ -2,11 +2,20 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sparkles, PenLine } from 'lucide-react'
 import { TargetAllocationModal } from '../components/TargetAllocationModal'
+import { TaxBracketDialog } from '../components/TaxBracketDialog'
 import { CoachMark } from '../components/CoachMark'
+import { ExpandableDetail } from '../components/ExpandableDetail'
+import { TaxBreakdownPanel } from '../components/TaxBreakdownPanel'
+import { FundSelectionAssistantEntry } from '../components/FundSelectionAssistantEntry'
 import { useAppStore } from '../store/useAppStore'
 import { runOptimization, shortAssetClass } from '../engine/index'
 import type { Recommendation } from '../types'
-import { formatCurrency, formatCurrencyCompact, formatShares, formatPercent, accountAllocStr } from '../utils/format'
+import { formatCurrency, formatCurrencyCompact, formatShares, formatPercent, accountAllocStr, formatTaxFigure } from '../utils/format'
+import {
+  bannerRateDisplay, bannerShowYtdRealized, bannerShowSeparateGainLoss, CONSOLIDATED_GAIN_LOSS_LABEL,
+  bannerNetTaxLabel, bannerShowEarlyWithdrawalPenalty, EARLY_WITHDRAWAL_PENALTY_LABEL,
+  EARLY_WITHDRAWAL_PENALTY_VALUE, EARLY_WITHDRAWAL_PENALTY_NOTE,
+} from '../utils/accountBanner'
 import { buildScenarioFromRecommendation, isDuplicateScenario } from '../utils/scenarioBuilder'
 import { NarrationBlock } from '../components/NarrationBlock'
 import { buildFundResultNarrationInput } from '../utils/narrationBuilders'
@@ -23,9 +32,6 @@ function RadioDot({ selected }: { selected: boolean }) {
 function fmtPct1(n: number): string {
   return new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n)
 }
-function fmtPct2(n: number): string {
-  return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
-}
 function fmtSigned(n: number): string {
   return (n >= 0 ? '+' : '−') + formatCurrency(Math.abs(n))
 }
@@ -34,10 +40,10 @@ export default function FundSelectionAutomated() {
   const navigate = useNavigate()
 
   const {
-    portfolio, targetSaleAmount, activeAccountId, optimizationPriority, activeTaxRates,
+    portfolio, targetSaleAmount, activeAccountId, setActiveAccountId, optimizationPriority, activeTaxRates,
     recommendation, setRecommendation, setTargetSaleAmount, setOptimizationPriority,
     scenarios, addScenario, updateScenario, activeScenarioId, setActiveScenarioId, setPortfolio,
-    setMode,
+    setMode, demoSettings,
   } = useAppStore()
 
   // Local input state for the amount field (display only — store is source of truth)
@@ -63,6 +69,7 @@ export default function FundSelectionAutomated() {
   }, [targetSaleAmount])
 
   const [showAllocModal, setShowAllocModal] = useState(false)
+  const [taxBracketOpen, setTaxBracketOpen] = useState(false)
 
   // ── Engine call ──────────────────────────────────────────────────────────
 
@@ -79,13 +86,36 @@ export default function FundSelectionAutomated() {
     setRecommendation(result as Recommendation)
   }, [portfolio, activeAccountId, activeTaxRates, setRecommendation])
 
-  // Run engine on mount if recommendation is null or stale
+  // Compute the recommendation for the active account on mount and on every
+  // genuine account change (D059 follow-up). Previously split across two
+  // effects — a mount-only one guarded by `!recommendation`, and an
+  // account-change one guarded to skip its own first invocation (on the
+  // theory the mount effect already covered it) — which meant a component
+  // that mounts with a *stale* non-null `recommendation` (e.g. switching
+  // accounts on a different page, then navigating back here) would show the
+  // wrong account's figures: the mount effect's `!recommendation` check is
+  // false (recommendation exists, just for the wrong account), and the
+  // account effect skips its own first render unconditionally. This was
+  // only ever hidden in dev because React StrictMode double-invokes mount
+  // effects, and the account effect's guard ref gets flipped `false` by its
+  // own first (thrown-away) invocation — so its second invocation, still
+  // within the same mount, genuinely fires and happens to recompute
+  // correctly. That's a StrictMode-only accident, not real behavior — a
+  // production build (no StrictMode) would show the stale account's figures
+  // with no recovery. A single effect keyed on `activeAccountId`, with no
+  // skip guard, always recomputes for whichever account is actually active
+  // — on first mount and on every subsequent switch alike — so correctness
+  // doesn't depend on a dev-only double-invoke masking the real gap.
   useEffect(() => {
     const amt = targetSaleAmount ?? 0
-    if (amt > 0 && !recommendation) {
-      runEngine(amt, optimizationPriority)
-    }
-  }, []) // intentionally run once on mount
+    if (amt > 0) runEngine(amt, optimizationPriority)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccountId])
+
+  function switchAccount(accountId: string) {
+    if (accountId === activeAccountId) return
+    setActiveAccountId(accountId)
+  }
 
   // ── Derived display values ───────────────────────────────────────────────
 
@@ -98,16 +128,30 @@ export default function FundSelectionAutomated() {
   const estSTGains = rec ? rec.fund_results.reduce((s, f) => s + f.est_st_gain_loss, 0) : null
   const estLTGains = rec ? rec.fund_results.reduce((s, f) => s + f.est_lt_gain_loss, 0) : null
   const estNetTax = rec?.est_net_tax ?? null
-  const effectiveRate = rec?.effective_rate ?? null
 
   const ytd = portfolio?.ytd_gains_record
   const taxRates = activeTaxRates
 
-  // Account data from store
+  // Account data from store. `activeAcct` is whichever account is actually
+  // active (drives the fund table below); `taxableAcct` specifically names
+  // the Taxable Brokerage account for its own header row, distinct from
+  // `activeAcct` now that the active account can be any of the three (D057)
+  // — these two were the same variable before switching existed.
   const accounts = portfolio?.accounts ?? []
-  const taxableAcct = accounts.find(a => a.account_id === activeAccountId)
+  const activeAcct = accounts.find(a => a.account_id === activeAccountId)
+  const taxableAcct = accounts.find(a => a.account_type === 'taxable_brokerage')
   const iraAcct = accounts.find(a => a.account_type === 'traditional_IRA')
   const rothAcct = accounts.find(a => a.account_type === 'roth_IRA')
+
+  // IRA banner redesign — display/layout only, per-account-type content
+  // decisions all live in accountBanner.ts (single source of truth across
+  // all six real touchpoints, not re-derived per page).
+  const rateDisplay = bannerRateDisplay(activeAcct?.account_type, taxRates)
+  const showYtd = bannerShowYtdRealized(activeAcct?.account_type)
+  const showSeparateGainLoss = bannerShowSeparateGainLoss(activeAcct?.account_type)
+  const combinedGainLoss = estSTGains !== null && estLTGains !== null ? estSTGains + estLTGains : null
+  const netTaxLabel = bannerNetTaxLabel(activeAcct?.account_type)
+  const showPenalty = bannerShowEarlyWithdrawalPenalty(activeAcct?.account_type)
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -147,7 +191,7 @@ export default function FundSelectionAutomated() {
   // REQ-A5-004: "Go to Scenario Analysis" → save/update scenario then navigate
   function handleGoToScenarios() {
     if (rec) {
-      const scenario = buildScenarioFromRecommendation(rec, portfolio, activeTaxRates)
+      const scenario = buildScenarioFromRecommendation(rec, portfolio, activeTaxRates, activeAccountId)
       if (activeScenarioId) {
         // Editing an existing scenario → update it in place (Fix 2)
         updateScenario(activeScenarioId, { ...scenario, scenario_id: activeScenarioId })
@@ -173,6 +217,7 @@ export default function FundSelectionAutomated() {
 
   return (
     <>
+      {taxBracketOpen && <TaxBracketDialog onClose={() => setTaxBracketOpen(false)} />}
       {showAllocModal && (
         <TargetAllocationModal
           onClose={() => setShowAllocModal(false)}
@@ -225,6 +270,12 @@ export default function FundSelectionAutomated() {
               <CoachMark id="mode-toggle" text="Automated mode uses an AI optimization engine to recommend which funds to sell and how much, minimizing your estimated tax burden while improving portfolio allocation. Manual mode gives you direct control over fund selection, cost basis method, and individual lot choices." />
             </div>
           </div>
+
+          {/* Assistant entry point — visible only while nothing has been
+              specified yet (no valid nonzero amount), reactive to the same
+              live inputDollars state "Calculate"/"Recalculate" already uses,
+              not a separate "has been shown" flag. */}
+          {inputDollars <= 0 && <FundSelectionAssistantEntry />}
 
           {/* Row 2 — Amount input + Recalculate + Optimization priority */}
           <div className="flex items-end gap-3 px-8 w-full">
@@ -279,52 +330,92 @@ export default function FundSelectionAutomated() {
 
               <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">TAX BRACKET</span>
+                  <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{rateDisplay.label}</span>
                   <CoachMark id="tax" text="We're using a mid-range tax rate as a starting point. If you know your bracket, you can select it below for a more accurate estimate." />
                 </div>
-                <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{Math.round(taxRates.st_rate * 100)}% ST / {Math.round(taxRates.lt_rate * 100)}% LT</span>
-                <a className="text-[12px] text-[#1255cc] underline cursor-pointer whitespace-nowrap">Change</a>
+                <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{rateDisplay.value}</span>
+                {rateDisplay.changeable && (
+                  <a onClick={() => setTaxBracketOpen(true)} className="text-[12px] text-[#1255cc] underline cursor-pointer whitespace-nowrap">Change</a>
+                )}
               </div>
               <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
 
-              <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">YTD REALIZED</span>
-                  <CoachMark id="ytd" text="This shows capital gains you've already realized this year. Selling more shares adds to this total." />
-                </div>
-                {ytd ? (
-                  <>
-                    <span className="text-[12px] text-vg-ink whitespace-nowrap">ST {formatCurrency(ytd.st_gains_realized_ytd)}</span>
-                    <span className="text-[12px] text-vg-ink whitespace-nowrap">LT {formatCurrency(ytd.lt_gains_realized_ytd)}</span>
-                  </>
-                ) : <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">—</span>}
-              </div>
-              <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+              {showYtd && (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">YTD REALIZED</span>
+                      <CoachMark id="ytd" text="This shows capital gains you've already realized this year. Selling more shares adds to this total." />
+                    </div>
+                    {ytd ? (
+                      <>
+                        <span className="text-[12px] text-vg-ink whitespace-nowrap">ST {formatCurrency(ytd.st_gains_realized_ytd)}</span>
+                        <span className="text-[12px] text-vg-ink whitespace-nowrap">LT {formatCurrency(ytd.lt_gains_realized_ytd)}</span>
+                      </>
+                    ) : <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">—</span>}
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              )}
+
+              {showSeparateGainLoss ? (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. ST GAINS</span>
+                    <span className={`text-[16px] font-bold whitespace-nowrap ${estSTGains !== null && estSTGains > 0 ? 'text-[#007a00]' : estSTGains !== null && estSTGains < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
+                      {estSTGains !== null ? fmtSigned(estSTGains) : '—'}
+                    </span>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. LT GAINS</span>
+                    <span className={`text-[16px] font-bold whitespace-nowrap ${estLTGains !== null && estLTGains > 0 ? 'text-[#007a00]' : estLTGains !== null && estLTGains < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
+                      {estLTGains !== null ? fmtSigned(estLTGains) : '—'}
+                    </span>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{CONSOLIDATED_GAIN_LOSS_LABEL}</span>
+                    <span className={`text-[16px] font-bold whitespace-nowrap ${combinedGainLoss !== null && combinedGainLoss > 0 ? 'text-[#007a00]' : combinedGainLoss !== null && combinedGainLoss < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
+                      {combinedGainLoss !== null ? fmtSigned(combinedGainLoss) : '—'}
+                    </span>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              )}
 
               <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. ST GAINS</span>
-                <span className={`text-[16px] font-bold whitespace-nowrap ${estSTGains !== null && estSTGains > 0 ? 'text-[#007a00]' : estSTGains !== null && estSTGains < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
-                  {estSTGains !== null ? fmtSigned(estSTGains) : '—'}
-                </span>
-              </div>
-              <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
-
-              <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. LT GAINS</span>
-                <span className={`text-[16px] font-bold whitespace-nowrap ${estLTGains !== null && estLTGains > 0 ? 'text-[#007a00]' : estLTGains !== null && estLTGains < 0 ? 'text-vg-red' : 'text-vg-ink'}`}>
-                  {estLTGains !== null ? fmtSigned(estLTGains) : '—'}
-                </span>
-              </div>
-              <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
-
-              <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
-                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. NET TAX</span>
+                <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{netTaxLabel}</span>
                 <span className="text-[16px] font-bold text-vg-ink whitespace-nowrap">{estNetTax !== null ? formatCurrency(estNetTax) : '—'}</span>
-                <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">
-                  {effectiveRate !== null ? `${fmtPct2(effectiveRate * 100)}% effective rate` : ''}
-                </span>
+                {rec && (
+                  <ExpandableDetail label="Breakdown">
+                    <TaxBreakdownPanel
+                      accountType={activeAcct?.account_type}
+                      funds={rec.fund_results}
+                      taxRates={taxRates}
+                      saleTotal={rec.fund_results.reduce((s, f) => s + f.sell_amount, 0)}
+                    />
+                  </ExpandableDetail>
+                )}
               </div>
               <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+
+              {showPenalty && (
+                <>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 overflow-hidden px-3">
+                    <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">{EARLY_WITHDRAWAL_PENALTY_LABEL}</span>
+                    <span className="text-[16px] font-bold text-vg-ink whitespace-nowrap">{EARLY_WITHDRAWAL_PENALTY_VALUE}</span>
+                    <ExpandableDetail label="Why?">
+                      <p className="text-[11.5px] text-vg-ink-muted leading-relaxed">{EARLY_WITHDRAWAL_PENALTY_NOTE}</p>
+                    </ExpandableDetail>
+                  </div>
+                  <div className="self-stretch w-px bg-[#c8d8d4] shrink-0" />
+                </>
+              )}
 
               <div className="flex flex-col gap-0.5 flex-1 min-w-0 overflow-hidden px-3">
                 <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">IMPACT</span>
@@ -349,35 +440,30 @@ export default function FundSelectionAutomated() {
 
           </div>
 
-          {/* Fund Table */}
+          {/* Fund Table. Account rows stay in fixed canonical order (Taxable
+              Brokerage → Traditional IRA → Roth IRA, per dev/CLAUDE.md's
+              withdrawal-priority rule) regardless of which is active —
+              selecting an account only controls which row's fund table
+              expands, never row position (D058). The fund-table section is
+              computed once and rendered directly under whichever row is
+              actually active, so the heading and the funds shown beneath it
+              can never refer to different accounts. */}
           <div className="flex flex-col items-start px-8 w-full">
             <div className="flex flex-col items-start w-full border border-[#e8e9e9]">
 
-              {/* Taxable Brokerage account header */}
-              <div className="flex h-16 items-center px-4 bg-[#f8f8f8] border-b border-[#e8e9e9] w-full">
-                <RadioDot selected={true} />
-                <div className="w-2 shrink-0" />
-                <div className="flex gap-1 items-center">
-                  <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">Taxable Brokerage</span>
-                  <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{taxableAcct?.masked_number ?? '...4782'}</span>
-                </div>
-                <div className="flex-1" />
-                <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{taxableAcct ? accountAllocStr(taxableAcct) : ''}</span>
-                <div className="w-4 shrink-0" />
-                <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{taxableAcct ? formatCurrency(taxableAcct.account_balance) : '—'}</span>
-                <div className="w-4 shrink-0" />
-              </div>
+              {(() => {
+                const fundTableSection = (
+                  <>
+                    {/* Column header */}
+                    <div className="flex h-9 items-center px-3 bg-[#f8f8f8] border border-[#e0e0e0] w-full shrink-0">
+                      <div className="w-[280px] px-2 flex items-center h-full shrink-0"><span className="text-[12px] font-semibold text-vg-ink">FUND</span></div>
+                      <div className="w-[140px] px-2 flex items-center h-full shrink-0"><span className="text-[12px] font-semibold text-vg-ink">POSITION</span></div>
+                      <div className="flex-1" />
+                    </div>
 
-              {/* Column header */}
-              <div className="flex h-9 items-center px-3 bg-[#f8f8f8] border border-[#e0e0e0] w-full shrink-0">
-                <div className="w-[280px] px-2 flex items-center h-full shrink-0"><span className="text-[12px] font-semibold text-vg-ink">FUND</span></div>
-                <div className="w-[140px] px-2 flex items-center h-full shrink-0"><span className="text-[12px] font-semibold text-vg-ink">POSITION</span></div>
-                <div className="flex-1" />
-              </div>
-
-              {/* Engine-driven fund rows */}
-              {rec?.fund_results.map(fr => {
-                const holding = taxableAcct?.holdings.find(h => h.fund_id === fr.fund_id)
+                    {/* Engine-driven fund rows */}
+                    {rec?.fund_results.map(fr => {
+                const holding = activeAcct?.holdings.find(h => h.fund_id === fr.fund_id)
                 const stGain = fr.est_st_gain_loss
                 const ltGain = fr.est_lt_gain_loss
                 return (
@@ -410,7 +496,7 @@ export default function FundSelectionAutomated() {
                       </div>
                       <div className="w-[85px] h-full flex flex-col justify-center gap-[3px] px-2 shrink-0 overflow-hidden">
                         <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">EST. TAX</span>
-                        <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{formatCurrency(fr.est_tax_gross)}</span>
+                        <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{formatTaxFigure(fr.est_tax_gross)}</span>
                       </div>
                       <div className="w-[110px] h-full flex flex-col justify-center gap-[3px] px-2 shrink-0 overflow-hidden">
                         <span className="text-[10px] text-vg-ink-muted whitespace-nowrap">IMPACT</span>
@@ -422,66 +508,106 @@ export default function FundSelectionAutomated() {
                     </div>
                     <div className="flex items-center px-4 py-2 w-full bg-white">
                       <NarrationBlock
+                        provider={demoSettings.narrationProvider ?? undefined}
                         input={buildFundResultNarrationInput({
                           fundResults: [fr],
                           portfolio,
-                          accountType: 'taxable_brokerage',
-                          segment: 'A',
+                          // Was hardcoded to taxable_brokerage regardless of
+                          // which account is actually active — meant an IRA
+                          // sale's narration was always framed as capital
+                          // gains, never ordinary-income/tax-free (D058).
+                          accountType: activeAcct?.account_type ?? 'taxable_brokerage',
+                          segment: demoSettings.narrationSegment,
                           est_net_tax: rec?.est_net_tax,
                           effective_rate: rec?.effective_rate,
+                          est_early_withdrawal_penalty: rec?.est_early_withdrawal_penalty,
                         })}
                       />
                     </div>
                   </div>
                 )
-              })}
+                    })}
 
-              {/* Placeholder when engine hasn't run yet */}
-              {!rec && (
-                <div className="flex h-16 items-center px-4 w-full bg-white border-b border-[#e8e9e9]">
-                  <span className="text-[14px] text-vg-ink-muted italic">Generating recommendation…</span>
-                </div>
-              )}
-
-              {/* Traditional IRA */}
-              <div className="flex h-16 items-center px-4 bg-[#f8f8f8] border-b border-[#e8e9e9] w-full">
-                <RadioDot selected={false} />
-                <div className="w-2 shrink-0" />
-                <div className="flex gap-1 items-center flex-wrap">
-                  <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">Traditional IRA</span>
-                  <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{iraAcct?.masked_number ?? '...2973'}</span>
-                  {iraAcct?.rmd_record && (
-                    <>
-                      <div className="w-2 shrink-0" />
-                      <div className="flex items-center gap-1 px-2 py-[2px] rounded-full bg-[#e07000]">
-                        <span className="text-[9px] font-bold text-white tracking-[0.36px] whitespace-nowrap">
-                          Remaining 2026 RMD: {formatCurrency(Math.round(iraAcct.rmd_record.rmd_remaining))}
-                        </span>
+                    {/* Placeholder when engine hasn't run yet */}
+                    {!rec && (
+                      <div className="flex h-16 items-center px-4 w-full bg-white border-b border-[#e8e9e9]">
+                        <span className="text-[14px] text-vg-ink-muted italic">Generating recommendation…</span>
                       </div>
-                    </>
-                  )}
-                </div>
-                <div className="flex-1" />
-                <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{iraAcct ? accountAllocStr(iraAcct) : ''}</span>
-                <div className="w-4 shrink-0" />
-                <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{iraAcct ? formatCurrency(iraAcct.account_balance) : '—'}</span>
-                <div className="w-4 shrink-0" />
-              </div>
+                    )}
+                  </>
+                )
 
-              {/* Roth IRA */}
-              <div className="flex h-16 items-center px-4 bg-[#f8f8f8] border-b border-[#e8e9e9] w-full">
-                <RadioDot selected={false} />
-                <div className="w-2 shrink-0" />
-                <div className="flex gap-1 items-center">
-                  <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">Roth IRA</span>
-                  <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{rothAcct?.masked_number ?? '...8148'}</span>
-                </div>
-                <div className="flex-1" />
-                <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{rothAcct ? accountAllocStr(rothAcct) : ''}</span>
-                <div className="w-4 shrink-0" />
-                <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{rothAcct ? formatCurrency(rothAcct.account_balance) : '—'}</span>
-                <div className="w-4 shrink-0" />
-              </div>
+                return (
+                  <>
+                    {/* Taxable Brokerage account header */}
+                    <div
+                      className="flex h-16 items-center px-4 bg-[#f8f8f8] border-b border-[#e8e9e9] w-full cursor-pointer"
+                      onClick={() => taxableAcct && switchAccount(taxableAcct.account_id)}
+                    >
+                      <RadioDot selected={activeAccountId === taxableAcct?.account_id} />
+                      <div className="w-2 shrink-0" />
+                      <div className="flex gap-1 items-center">
+                        <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">Taxable Brokerage</span>
+                        <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{taxableAcct?.masked_number ?? '...4782'}</span>
+                      </div>
+                      <div className="flex-1" />
+                      <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{taxableAcct ? accountAllocStr(taxableAcct) : ''}</span>
+                      <div className="w-4 shrink-0" />
+                      <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{taxableAcct ? formatCurrency(taxableAcct.account_balance) : '—'}</span>
+                      <div className="w-4 shrink-0" />
+                    </div>
+                    {activeAccountId === taxableAcct?.account_id && fundTableSection}
+
+                    {/* Traditional IRA */}
+                    <div
+                      className="flex h-16 items-center px-4 bg-[#f8f8f8] border-b border-[#e8e9e9] w-full cursor-pointer"
+                      onClick={() => iraAcct && switchAccount(iraAcct.account_id)}
+                    >
+                      <RadioDot selected={activeAccountId === iraAcct?.account_id} />
+                      <div className="w-2 shrink-0" />
+                      <div className="flex gap-1 items-center flex-wrap">
+                        <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">Traditional IRA</span>
+                        <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{iraAcct?.masked_number ?? '...2973'}</span>
+                        {iraAcct?.rmd_record && (
+                          <>
+                            <div className="w-2 shrink-0" />
+                            <div className="flex items-center gap-1 px-2 py-[2px] rounded-full bg-[#e07000]">
+                              <span className="text-[9px] font-bold text-white tracking-[0.36px] whitespace-nowrap">
+                                Remaining 2026 RMD: {formatCurrency(Math.round(iraAcct.rmd_record.rmd_remaining))}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex-1" />
+                      <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{iraAcct ? accountAllocStr(iraAcct) : ''}</span>
+                      <div className="w-4 shrink-0" />
+                      <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{iraAcct ? formatCurrency(iraAcct.account_balance) : '—'}</span>
+                      <div className="w-4 shrink-0" />
+                    </div>
+                    {activeAccountId === iraAcct?.account_id && fundTableSection}
+
+                    {/* Roth IRA */}
+                    <div
+                      className="flex h-16 items-center px-4 bg-[#f8f8f8] border-b border-[#e8e9e9] w-full cursor-pointer"
+                      onClick={() => rothAcct && switchAccount(rothAcct.account_id)}
+                    >
+                      <RadioDot selected={activeAccountId === rothAcct?.account_id} />
+                      <div className="w-2 shrink-0" />
+                      <div className="flex gap-1 items-center">
+                        <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">Roth IRA</span>
+                        <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{rothAcct?.masked_number ?? '...8148'}</span>
+                      </div>
+                      <div className="flex-1" />
+                      <span className="text-[12px] text-vg-ink-muted whitespace-nowrap">{rothAcct ? accountAllocStr(rothAcct) : ''}</span>
+                      <div className="w-4 shrink-0" />
+                      <span className="text-[14px] font-bold text-vg-ink whitespace-nowrap">{rothAcct ? formatCurrency(rothAcct.account_balance) : '—'}</span>
+                      <div className="w-4 shrink-0" />
+                    </div>
+                    {activeAccountId === rothAcct?.account_id && fundTableSection}
+                  </>
+                )
+              })()}
 
             </div>
           </div>

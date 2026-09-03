@@ -8,8 +8,10 @@
 import type {
   Portfolio, Recommendation, SavedScenario, ManualConfiguration,
   TransactionRecord, FundSaleResult, AccountingMethod, AllocationImpact,
+  TaxFigureOrNA,
 } from '../types'
 import { getMarketContextData } from '../data/loader'
+import { taxFigureToNumber } from './format'
 import {
   buildMarketContext,
   type NarrationInput, type NarrationFundLine, type NarrationSegment,
@@ -67,6 +69,17 @@ function marketContextFor(fundId: string, lotIds: string[]): number | undefined 
   return buildMarketContext(fundId, lotIds, trailing_12mo_return, market_context_exclusions)
 }
 
+// Omit-by-default coercion for the early-withdrawal-penalty figure (see
+// NarrationInput.est_early_withdrawal_penalty's own doc comment for why):
+// the 'not_applicable' sentinel and a genuine $0 are both indistinguishable
+// from "nothing to say" as far as narration is concerned, so both collapse
+// to undefined here — the one place this decision is made, not re-decided
+// per call site.
+function meaningfulPenalty(v: TaxFigureOrNA | undefined): number | undefined {
+  if (v === undefined || v === 'not_applicable' || v === 0) return undefined
+  return v
+}
+
 // ---------------------------------------------------------------------------
 // Touchpoint 1 — Fund Selection rationale (built from FundSaleResult[],
 // shared by Recommendation.fund_results and ManualConfiguration.fund_results)
@@ -80,6 +93,7 @@ export function buildFundResultNarrationInput(params: {
   touchpoint?: NarrationTouchpoint
   est_net_tax?: number
   effective_rate?: number
+  est_early_withdrawal_penalty?: TaxFigureOrNA
   wait_and_save_notices?: Array<{ fund_id: string; lot_id: string; days_until_lt: number; tax_savings_by_waiting: number }>
 }): NarrationInput {
   const funds: NarrationFundLine[] = params.fundResults.map(fr => {
@@ -94,7 +108,12 @@ export function buildFundResultNarrationInput(params: {
       sell_amount: fr.sell_amount,
       st_gain_loss: fr.est_st_gain_loss,
       lt_gain_loss: fr.est_lt_gain_loss,
-      est_tax_gross: fr.est_tax_gross,
+      // Coerced to a plain number here, not passed through as-is — narration
+      // already has its own correct, tested handling of the IRA $0 case
+      // (CLAUDE.md §7: "$0 tax caused by IRA/Roth account type... must be
+      // stated"), unrelated to the not-applicable/zero distinction the
+      // engine's own per-fund display now makes. Not a narration change.
+      est_tax_gross: taxFigureToNumber(fr.est_tax_gross),
       impact_pct: fr.impact_pct,
       lots: fr.lots_sold.map(l => ({
         lot_id: l.lot_id,
@@ -115,6 +134,7 @@ export function buildFundResultNarrationInput(params: {
     funds,
     est_net_tax: params.est_net_tax,
     effective_rate: params.effective_rate,
+    est_early_withdrawal_penalty: meaningfulPenalty(params.est_early_withdrawal_penalty),
     losses_harvested: lossesHarvested,
     wait_and_save_notices: params.wait_and_save_notices,
   }
@@ -147,7 +167,10 @@ export function buildScenarioNarrationInput(params: {
       sell_amount: fs.sell_amount,
       st_gain_loss: fs.st_gain_loss ?? 0,
       lt_gain_loss: fs.lt_gain_loss ?? 0,
-      est_tax_gross: fs.est_tax_gross,
+      // Same coercion, same reasoning as buildFundResultNarrationInput above
+      // — not a narration change, just preserving its existing behavior
+      // now that the underlying field can carry the not-applicable sentinel.
+      est_tax_gross: fs.est_tax_gross === undefined ? undefined : taxFigureToNumber(fs.est_tax_gross),
       lots: fs.lots_selected.map(l => ({
         lot_id: l.lot_id,
         acquisition_date: findLotAcquisitionDate(params.portfolio, fs.fund_id, l.lot_id),
@@ -202,6 +225,12 @@ export function buildOrderConfirmationNarrationInput(params: {
     touchpoint: 'order_confirmation_summary',
     est_net_tax: source.kind === 'recommendation' ? source.data.est_net_tax : undefined,
     effective_rate: source.kind === 'recommendation' ? source.data.effective_rate : undefined,
+    // Only a Recommendation carries this field at all (D083/D085 deliberately
+    // didn't thread it through ManualConfiguration/SavedScenario) — 'manual'
+    // and 'scenario' sources correctly get undefined here, which
+    // meaningfulPenalty() (inside buildFundResultNarrationInput) already
+    // treats identically to 'not_applicable': omit.
+    est_early_withdrawal_penalty: source.kind === 'recommendation' ? source.data.est_early_withdrawal_penalty : undefined,
   })
 }
 

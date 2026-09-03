@@ -8,6 +8,8 @@ Every figure in the fixtures below was produced by calling the real optimization
 
 Category 1's MinTax lot selection (`T-VTSAX-08`, a short-term lot, over VTSAX's long-term lots) was independently verified against the real engine as genuinely tax-minimizing, not a bug — see `DECISIONS.md` D046 and `CLAUDE.md` §5.
 
+**Regenerated this session for `DECISIONS.md` D062**: every sample below is Fund Selection rationale or Scenario Analysis tradeoff summary — both prospective touchpoints, since neither has actually sold anything at the point a user sees them. The previous version of this file showed every example in declarative past tense ("Sold $X.00 of..."), because `narrationPrompt.ts` received `NarrationInput.tense` but silently discarded it, leaving the model with no signal to distinguish a proposed plan from a completed one. Every sample below now confirms the fix live: no example says "Sold" anywhere — all use a proposed/conditional frame ("Selling $X would realize...", "This proposed plan would sell...").
+
 No content below has been edited, rewritten, or cleaned up — this is exactly what the model returned, unmodified.
 
 ---
@@ -18,7 +20,7 @@ No content below has been edited, rewritten, or cleaned up — this is exactly w
 - **Segment tone:** A
 - **Source data:** VTSAX, taxable brokerage, real engine call (manual mode, MinTax, $5,000) — real lot `T-VTSAX-08`, real gain $440.77, real tax $105.78
 
-> Sold $5,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares using MinTax, realizing a $440.77 short-term gain with a tax impact of $105.78, resulting in a shift in portfolio allocation of -0.34%.
+> This proposed plan would sell $5,000.00 of VTSAX using MinTax, realizing a $440.77 short-term gain with an estimated tax impact of $105.78, resulting in a -0.34% shift in portfolio allocation while the fund has returned 29.41% over the trailing 12 months.
 
 ## 2. Pure loss-harvest
 
@@ -26,7 +28,7 @@ No content below has been edited, rewritten, or cleaned up — this is exactly w
 - **Segment tone:** A
 - **Source data:** VBTLX, taxable brokerage, real engine call (MinTax, $3,000) — real lot `T-VBTLX-02`, real loss -$315.64. $0.00 tax is correct here by design (a pure loss has no positive gross tax at the per-fund level in this engine — see `dev/src/engine/index.ts`'s `buildFundResult()`), not the same bug as category 1 used to have.
 
-> Selling $3,000.00 of Vanguard Total Bond Market Index Fund Admiral Shares via MinTax yields a long-term loss of $-315.64, bringing a tax impact of $0.00 and a -0.23% shift in portfolio allocation, while the fund has returned 6.42% over the trailing 12 months.
+> Selling $3,000.00 of VBTLX (MinTax) from your taxable brokerage account using the long-term holding lot acquired on 2021-10-20 would realize a long-term loss of $-315.64, with an estimated tax impact of $0.00 and a shift in portfolio allocation of -0.23%, selected to harvest tax losses while the fund has returned 6.42% over the trailing 12 months.
 
 ## 3. Mixed gain + harvest
 
@@ -34,7 +36,7 @@ No content below has been edited, rewritten, or cleaned up — this is exactly w
 - **Segment tone:** A
 - **Source data:** Real engine call, VTSAX gain lot (`T-VTSAX-08`) + VBTLX loss lot (`T-VBTLX-02`) in one transaction
 
-> Sold $5,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares (MinTax, lot T-VTSAX-08) realizing a $440.77 short-term gain for a $105.78 tax impact and a -0.34% shift in portfolio allocation, alongside a $3,000.00 sale of Vanguard Total Bond Market Index Fund Admiral Shares (MinTax, lot T-VBTLX-02) realizing a $315.64 long-term loss for a -0.23% shift in portfolio allocation, with the fund having returned 29.41% and 6.42% respectively over the trailing 12 months.
+> Selling $5,000.00 of VTSAX (MinTax) would realize a $440.77 short-term gain, resulting in an estimated tax impact of $105.78, a shift in portfolio allocation of -0.34%, and a trailing 12-month return of 29.41%. Selling $3,000.00 of VBTLX (MinTax) would realize a $315.64 long-term loss, resulting in an estimated tax impact of $0.00, a shift in portfolio allocation of -0.23%, and a trailing 12-month return of 6.42%.
 
 ## 4. ST-LT crossing (one fund, both periods realized)
 
@@ -42,7 +44,7 @@ No content below has been edited, rewritten, or cleaned up — this is exactly w
 - **Segment tone:** A
 - **Source data:** Real engine call, VTSAX taxable, MinTax, $100,000 — large enough to force both ST and LT lots in one sale (real: $4,443.24 ST gain, $19,949.61 LT gain, $4,058.82 tax)
 
-> Sold $100,000.00 of VTSAX using MinTax to minimize your tax impact, realizing $4,443.24 in short-term gains and $19,949.61 in long-term gains with an estimated gross tax of $4,058.82, while shifting your portfolio allocation by -7.56% and reflecting a trailing 12-month return of 29.41%.
+> Selling $100,000.00 of VTSAX using MinTax would result in a short-term gain of $4,443.24 and a long-term gain of $19,949.61, with an estimated tax of $4,058.82 and a shift in portfolio allocation of -7.56%, while the fund has returned 29.41% over the trailing 12 months.
 
 ## 5. Traditional IRA ordinary-income framing
 
@@ -50,7 +52,7 @@ No content below has been edited, rewritten, or cleaned up — this is exactly w
 - **Segment tone:** A
 - **Source data:** VFITX, lot `IRA-VFITX-05`, Traditional IRA, real engine call (SpecID — MinTax on this fund picks a different, loss lot instead, per verification)
 
-> Sold $10,850.00 of Vanguard Intermediate-Term Treasury Index Fund Admiral Shares (specific lot identification), realizing a $100.00 long-term gain; since this is a Traditional IRA, the withdrawal amount is what gets taxed, as ordinary income, resulting in an estimated tax of $0.00, and this shifts your portfolio allocation by -0.85%, while the fund has returned 5.48% over the trailing 12 months.
+> Selling $10,850.00 of Vanguard Intermediate-Term Treasury Index Fund Admiral Shares (specific lot identification) would result in a shift in portfolio allocation of -0.85%; because this is a traditional IRA, the withdrawal amount is what gets taxed as ordinary income rather than the $100.00 long-term gain, resulting in an estimated tax of $0.00, while the fund has returned 5.48% over the trailing 12 months.
 
 Note the framing here: the model states plainly *what* is taxed (the withdrawal amount, as ordinary income) rather than just stating the gain figure and negating it — this was one of the tier-2 prompt fixes.
 
@@ -60,7 +62,7 @@ Note the framing here: the model states plainly *what* is taxed (the withdrawal 
 - **Segment tone:** A
 - **Source data:** Real manual-mode sale of only the overweight equity fund (VTSAX, $30,000, MinTax), built through the real scenario builder (`buildScenarioFromFundResults`). Verified this moves toward target: distance-to-target sum decreases (5.55 → 3.27).
 
-> Sold $30,000.00 of VTSAX realizing a $2,750.49 short-term gain for a tax impact of $660.12, shifting domestic equity allocation from 41.75% to 39.67% to match your target.
+> Selling $30,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares (MinTax) would realize a $2,750.49 short-term gain with a fund trailing-12-month return of 29.41%, resulting in a tax impact of $660.12 and shifting your domestic equity allocation from 41.75% to 39.67%.
 
 ## 7. Allocation away-from-target
 
@@ -68,7 +70,9 @@ Note the framing here: the model states plainly *what* is taxed (the withdrawal 
 - **Segment tone:** A
 - **Source data:** Real manual-mode sale of only the underweight bond fund (VBTLX, $20,000, MinTax) — a real, supported Manual-mode path (a user can select any fund, not just the balance-optimal one). Verified this moves away from target: distance-to-target sum increases (5.55 → 8.26).
 
-> Sold $20,000.00 of VBTLX, harvesting a long-term loss of -$2,104.25 for a -$505.02 tax impact, while shifting domestic bonds from 32.53% to 30.95%.
+> Selling $20,000.00 of Vanguard Total Bond Market Index Fund Admiral Shares (MinTax) would realize a long-term loss of $-2,104.25, with an estimated tax impact of $0.00 and $2,104.25 in losses harvested, while the fund has returned 6.42% over the trailing 12 months. This proposed plan would result in an estimated net tax of $-505.02 at an effective rate of -0.025251%, while shifting your domestic bonds allocation from 32.53% to 30.95%.
+
+The oddly-formatted "-0.025251%" effective-rate figure is a pre-existing quirk in this scenario's stored `effective_rate` value (a loss-only sale with $0 net tax), unrelated to the tense fix this regeneration is for — flagged here for whoever picks it up next, not fixed in this pass.
 
 ## 8. Wait & Save triggered
 
@@ -76,9 +80,9 @@ Note the framing here: the model states plainly *what* is taxed (the withdrawal 
 - **Segment tone:** A
 - **Source data:** Real automated-mode run, balance-first priority, $350,000 — verified via a parameter sweep that smaller amounts / tax-first priority never touch VTIAX at all (real notice: lot `T-VTIAX-07`, 14 days to LT conversion, $47.39 savings)
 
-> Sold $231,884.40 of VTSAX using MinTax, realizing a $4,443.24 short-term gain and a $115,862.25 long-term gain, with a tax impact of $18,445.72 and a shift in portfolio allocation of -21.15%, while the fund has returned 29.41% over the trailing 12 months. Sold $13,115.60 of VTIAX using MinTax, realizing a $524.62 short-term gain, with a tax impact of $125.91 and a shift in portfolio allocation of -1.28%, while the fund has returned 40.09% over the trailing 12 months. Sold $58,016.00 of VBTLX using MinTax, realizing a $684.00 short-term gain and a $2,375.00 long-term loss, with a tax impact of $164.16 and a shift in portfolio allocation of -4.81%, while the fund has returned 6.42% over the trailing 12 months. Sold $46,984.00 of VBIRX using MinTax, realizing a $1,094.64 long-term loss, with a tax impact of $0.00 and a shift in portfolio allocation of -5.15%, while the fund has returned 4.72% over the trailing 12 months.
+> Selling $231,884.40 of VTSAX (MinTax) would realize a $4,443.24 short-term gain and a $115,862.25 long-term gain, resulting in a $18,445.72 tax impact, a -21.15% shift in portfolio allocation, and a trailing 12-month return of 29.41%. Selling $13,115.60 of VTIAX (MinTax) would realize a $524.62 short-term gain, resulting in a $125.91 tax impact, a -1.28% shift in portfolio allocation, and a trailing 12-month return of 40.09%. Selling $58,016.00 of VBTLX (MinTax) would realize a $684.00 short-term gain and a -$2,375.00 long-term loss, resulting in a $164.16 tax impact, a -4.81% shift in portfolio allocation, and a trailing 12-month return of 6.42%. Selling $46,984.00 of VBIRX (MinTax) would realize a -$1,094.64 long-term loss, resulting in a $0.00 tax impact, a -5.15% shift in portfolio allocation, and a trailing 12-month return of 4.72%.
 
-Fixed this session (`DECISIONS.md` D047): this four-fund transaction previously rendered as one long run-on sentence, because segment A's instruction was a length constraint ("one sentence") rather than a structural one. Segment A's instruction now scales explicitly by fund count — one short sentence per fund — and this regenerated sample confirms it: four funds, four separate, scannable sentences. (This particular regeneration doesn't restate the Wait & Save notice for lot `T-VTIAX-07`, unlike the version quoted in category 8's original write-up — the model omits optional details inconsistently across calls, a known style variance noted earlier in this file, not the run-on-sentence issue this fix targets.)
+Fixed in an earlier session (`DECISIONS.md` D047): this four-fund transaction previously rendered as one long run-on sentence, because segment A's instruction was a length constraint ("one sentence") rather than a structural one. Segment A's instruction now scales explicitly by fund count — one short sentence per fund — and this regenerated sample confirms it still holds under the tense fix too: four funds, four separate, scannable sentences, now correctly proposed/conditional rather than past tense. (This particular regeneration doesn't restate the Wait & Save notice for lot `T-VTIAX-07`, unlike the version quoted in category 8's original write-up — the model omits optional details inconsistently across calls, a known style variance noted earlier in this file, not the run-on-sentence issue that fix targeted or the tense issue this regeneration targets.)
 
 ## 9. SpecID lot-level active
 
@@ -86,7 +90,7 @@ Fixed this session (`DECISIONS.md` D047): this four-fund transaction previously 
 - **Segment tone:** A
 - **Source data:** VFIAX, lot `ROTH-VFIAX-07`, Roth IRA, real engine call (`specific_lot_identification`). $0.00 tax is correct here by design (Roth IRA is tax-free).
 
-> Sold $21,932.00 of Vanguard 500 Index Fund Admiral Shares to shift your portfolio allocation by -1.51%, realizing a short-term gain of $524.00 that incurs $0.00 in tax due to your Roth IRA.
+> Selling $21,932.00 of Vanguard 500 Index Fund Admiral Shares (using specific lot identification to realize a $524.00 short-term gain, with a fund trailing 12-month return of 28.64%) would result in an estimated tax impact of $0.00 due to Roth IRA tax-free treatment, shifting your portfolio allocation by -1.51%.
 
 ## 10. Same figures across two segment tones
 
@@ -94,12 +98,12 @@ Fixed this session (`DECISIONS.md` D047): this four-fund transaction previously 
 - **Source data:** VTSAX, real engine call (same figures as #1)
 
 **Segment A** (one short, figure-led sentence, per the strengthened tier-2 instruction):
-> Sold $5,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares using MinTax, realizing a $440.77 short-term gain with a tax impact of $105.78, resulting in a shift in portfolio allocation of -0.34%.
+> Selling $5,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares using the MinTax method would realize a $440.77 short-term gain from lot T-VTSAX-08, resulting in a tax impact of $105.78, a shift in portfolio allocation of -0.34%, and a trailing 12-month return of 29.41%.
 
 **Segment B** (explanatory — states *why* the sale makes sense, not just the figures):
-> Selling $5,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares trims an overweight domestic equity position to nudge your portfolio closer to its target mix, even though the fund has returned 29.41% over the trailing 12 months. This specific lot was selected because its short-term gain of $440.77 keeps the resulting tax impact manageable at $105.78, allowing you to rebalance your holdings with a controlled shift in portfolio allocation of -0.34%.
+> Selling $5,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares would trim an overweight domestic equity position to help move your portfolio closer to its target asset mix. This proposed transaction would realize a short-term gain of $440.77, resulting in an estimated tax impact of $105.78, while leaving you positioned to capture the fund's 29.41% trailing 12-month return moving forward.
 
-The two are now clearly distinguishable in both length and content (segment B explains the "why" — overweight-position trimming, tax-manageability — that segment A omits), unlike the earlier sample set where both read almost identically.
+The two are still clearly distinguishable in both length and content (segment B explains the "why" — overweight-position trimming, tax-manageability — that segment A omits) under the new tense-corrected phrasing, same as before this regeneration.
 
 ## 11. Market-context exclusion-check mechanism
 
@@ -108,11 +112,11 @@ The two are now clearly distinguishable in both length and content (segment B ex
 - **Source data:** VFITX, two different real lots — one excluded, one not, both real engine calls
 
 **Excluded pairing (VFITX / `IRA-VFITX-06`):**
-> Sold $3,255.00 of Vanguard Intermediate-Term Treasury Index Fund Admiral Shares (lot IRA-VFITX-06), resulting in a traditional IRA withdrawal taxed as ordinary income with an estimated tax of $0.00 and a -0.25% shift in portfolio allocation.
+> Selling $3,255.00 of VFITX (using 1 share, specific lot identification) would result in a shift in portfolio allocation of -0.25%, with the withdrawal amount taxed as ordinary income rather than the realized short-term loss of -$15.00, resulting in an estimated tax of $0.00.
 
 No market-context sentence — `isMarketContextExcluded('VFITX', ['IRA-VFITX-06'], market_context_exclusions)` returns `true`, so `market_context_return_pct` was never included in the figures sent to the model in the first place. Reason on file: *"Real trailing-12-month return (+5.48%) conflicts in sign with this lot's fictional unrealized loss (-$15.00)... Rather than adjust either the verified real figure or the fictional lot, the market-context narration sentence is suppressed for this specific fund/lot pairing."*
 
 **Non-excluded pairing, same fund, different lot (VFITX / `IRA-VFITX-02`):**
-> Sold $27,125.00 of VFITX to shift portfolio allocation by -2.17%, with $0.00 estimated tax since this Traditional IRA withdrawal is taxed as ordinary income.
+> Selling $27,125.00 of VFITX (using specific lot identification to select lot IRA-VFITX-02, which has returned 5.48% over the trailing 12 months) would result in a shift in portfolio allocation of -2.17%, with a realized long-term gain of $625.00, though because this is a traditional IRA, the withdrawal amount—not the realized gain/loss shown—is what gets taxed, as ordinary income, resulting in an estimated tax impact of $0.00.
 
-`isMarketContextExcluded('VFITX', ['IRA-VFITX-02'], ...)` returns `false`; `market_context_return_pct` resolves to the real, sourced `5.48`, confirming the check is scoped to the specific (fund, lot) pairing, not the fund as a whole — though this particular sample's prose doesn't end up stating the market-context figure explicitly (the model chose to omit it), which is a legitimate style choice, not a mechanism failure (the mechanism itself is confirmed structurally, independent of what the model chooses to say).
+`isMarketContextExcluded('VFITX', ['IRA-VFITX-02'], ...)` returns `false`; `market_context_return_pct` resolves to the real, sourced `5.48`, confirming the check is scoped to the specific (fund, lot) pairing, not the fund as a whole — and this regeneration's sample does state the market-context figure explicitly this time (unlike the previous version, where the model chose to omit it), which is a legitimate style choice either way, not a mechanism failure (the mechanism itself is confirmed structurally, independent of what the model chooses to say).

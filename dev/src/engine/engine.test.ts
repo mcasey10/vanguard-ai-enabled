@@ -13,9 +13,10 @@ import { describe, test, expect } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
-import { runOptimization, KNOWN_ROUNDING_ARTIFACTS } from './index.js'
+import { runOptimization, KNOWN_ROUNDING_ARTIFACTS, computeNetTax, computeNetTaxBreakdown } from './index.js'
 import type { Portfolio, Lot } from '../types/index.js'
 import type { OptimizationParams } from './index.js'
+import { taxFigureToNumber } from '../utils/format.js'
 
 // ---------------------------------------------------------------------------
 // Load canonical dataset
@@ -95,7 +96,7 @@ describe('Case 1: Baseline — automated MinTax $25,000 from taxable', () => {
 
   test('net_tax ≤ gross_tax — losses offset gains', () => {
     if (result.mode !== 'automated') return
-    const grossTax = result.fund_results.reduce((s, f) => s + f.est_tax_gross, 0)
+    const grossTax = result.fund_results.reduce((s, f) => s + taxFigureToNumber(f.est_tax_gross), 0)
     expect(result.est_net_tax).toBeLessThanOrEqual(grossTax + EPSILON)
   })
 
@@ -652,5 +653,290 @@ describe('VT9 Scenario 2: VTSAX T-VTSAX-07 + VTIAX T-VTIAX-06', () => {
     const vtiaxFund = vt9s2.fund_selections.find(f => f.fund_id === 'VTIAX')
     const gain = vtiaxFund?.lots_selected.reduce((s, l) => s + l.realized_gain_loss, 0) ?? 0
     expect(Math.abs(gain - 2980.65)).toBeLessThanOrEqual(EPSILON)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Traditional IRA ordinary-income tax (DECISIONS.md IRA ordinary-income tax entry)
+//
+// Real engine calls throughout, per this task's own instruction — no
+// reconstructed fixtures. Real account IDs from sample-dataset.json:
+//   ACCT-TRAD-IRA-001 holds VBTLX + VFITX; ACCT-ROTH-IRA-001 holds VFIAX only.
+// ---------------------------------------------------------------------------
+
+const TRAD_IRA_ID = 'ACCT-TRAD-IRA-001'
+const ROTH_IRA_ID = 'ACCT-ROTH-IRA-001'
+
+describe('Traditional IRA ordinary-income tax — single-fund sale', () => {
+  const result = runOptimization({
+    portfolio: BASE_PORTFOLIO,
+    targetSaleAmount: 10000,
+    activeAccountId: TRAD_IRA_ID,
+    mode: 'automated',
+    optimizationPriority: 'tax-first',
+    activeTaxRates: DEFAULT_RATES,
+  })
+
+  test('est_net_tax = total withdrawn × st_rate ($10,000 × 24% = $2,400), not netted against gain/loss', () => {
+    if (result.mode !== 'automated') return
+    expect(result.est_net_tax).toBeCloseTo(2400, 2)
+  })
+
+  test('per-fund est_tax_gross is the not-applicable sentinel, not a numeric 0, even though the portfolio total is nonzero', () => {
+    if (result.mode !== 'automated') return
+    expect(result.fund_results.length).toBeGreaterThan(0)
+    for (const fr of result.fund_results) {
+      expect(fr.est_tax_gross).toBe('not_applicable')
+    }
+  })
+
+  test('est_early_withdrawal_penalty is the not-applicable sentinel (groundwork only, no calculation yet)', () => {
+    if (result.mode !== 'automated') return
+    expect(result.est_early_withdrawal_penalty).toBe('not_applicable')
+  })
+})
+
+describe('Traditional IRA ordinary-income tax — multi-fund sale sums the TOTAL withdrawal correctly, not per-fund', () => {
+  // $150,000 forces both of ACCT-TRAD-IRA-001's holdings (VBTLX + VFITX) to
+  // be sold, since neither alone covers the target — the real regression
+  // case for "sums sell amounts across multiple funds correctly" (task item
+  // 0's explicit self-audit concern), not just a single-fund sanity check.
+  const result = runOptimization({
+    portfolio: BASE_PORTFOLIO,
+    targetSaleAmount: 150000,
+    activeAccountId: TRAD_IRA_ID,
+    mode: 'automated',
+    optimizationPriority: 'tax-first',
+    activeTaxRates: DEFAULT_RATES,
+  })
+
+  test('more than one fund is actually sold in this fixture (a real multi-fund case, not accidentally single-fund)', () => {
+    if (result.mode !== 'automated') return
+    expect(result.fund_results.length).toBeGreaterThanOrEqual(2)
+  })
+
+  test('est_net_tax = SUM of every fund\'s sell_amount × st_rate — a naive sum of nonexistent per-fund tax figures would be $0', () => {
+    if (result.mode !== 'automated') return
+    const totalWithdrawn = result.fund_results.reduce((s, f) => s + f.sell_amount, 0)
+    expect(totalWithdrawn).toBeCloseTo(150000, 1)
+    const expectedTax = Math.round(totalWithdrawn * DEFAULT_RATES.st_rate * 100) / 100
+    expect(result.est_net_tax).toBeCloseTo(expectedTax, 2)
+    // Sanity: confirms this is genuinely testing the multi-fund summation
+    // path, not one fund happening to cover the whole target.
+    expect(result.fund_results.every(f => f.est_tax_gross === 'not_applicable')).toBe(true)
+  })
+})
+
+describe('Roth IRA regression — still exactly $0 at the portfolio level, now that Traditional IRA no longer shares its branch', () => {
+  const result = runOptimization({
+    portfolio: BASE_PORTFOLIO,
+    targetSaleAmount: 10000,
+    activeAccountId: ROTH_IRA_ID,
+    mode: 'automated',
+    optimizationPriority: 'tax-first',
+    activeTaxRates: DEFAULT_RATES,
+  })
+
+  test('est_net_tax is exactly 0', () => {
+    if (result.mode !== 'automated') return
+    expect(result.est_net_tax).toBe(0)
+  })
+
+  test('per-fund est_tax_gross is the not-applicable sentinel, not $0', () => {
+    if (result.mode !== 'automated') return
+    for (const fr of result.fund_results) {
+      expect(fr.est_tax_gross).toBe('not_applicable')
+    }
+  })
+})
+
+describe('Taxable brokerage regression — unaffected by the three-way branch rewrite', () => {
+  test('est_net_tax still computes via ST/LT netting, unchanged from Case 1\'s existing baseline', () => {
+    const result = runOptimization({
+      portfolio: BASE_PORTFOLIO,
+      targetSaleAmount: 25000,
+      activeAccountId: TAXABLE_ID,
+      mode: 'automated',
+      optimizationPriority: 'tax-first',
+      activeTaxRates: DEFAULT_RATES,
+    })
+    if (result.mode !== 'automated') return
+    expect(result.est_net_tax).toBeCloseTo(64.85, 2)
+    // Per-fund est_tax_gross remains a real number for taxable brokerage —
+    // the not-applicable sentinel is IRA-only.
+    for (const fr of result.fund_results) {
+      expect(typeof fr.est_tax_gross).toBe('number')
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// computeNetTaxBreakdown() (DECISIONS.md's breakdown-expanders entry) —
+// direct unit tests of the pure function, hand-constructed fund-result
+// arrays (not routed through runOptimization()) since these specifically
+// target arithmetic edge cases in the blended-rate attribution itself, not
+// engine fund-selection behavior. computeNetTax() is asserted alongside
+// computeNetTaxBreakdown().total throughout, as a regression guard that the
+// wrapper still returns exactly what the pre-refactor formula returned.
+// ---------------------------------------------------------------------------
+
+describe('computeNetTaxBreakdown — taxable brokerage, pure gain (both categories non-negative)', () => {
+  test('taxableAtST/taxableAtLT equal netSTGain/netLTGain exactly — no cross-category netting to attribute', () => {
+    const funds = [
+      { est_st_gain_loss: 645.81, est_lt_gain_loss: 0, sell_amount: 3000 },
+      { est_lt_gain_loss: 300, est_st_gain_loss: 0, sell_amount: 2000 },
+    ]
+    const b = computeNetTaxBreakdown(funds, 'taxable_brokerage', DEFAULT_RATES)
+    expect(b.netSTGain).toBeCloseTo(645.81, 2)
+    expect(b.netLTGain).toBeCloseTo(300, 2)
+    expect(b.taxableAtST).toBeCloseTo(645.81, 2)
+    expect(b.taxableAtLT).toBeCloseTo(300, 2)
+    expect(b.stTax).toBeCloseTo(645.81 * 0.24, 2)
+    expect(b.ltTax).toBeCloseTo(300 * 0.15, 2)
+    expect(b.total).toBeCloseTo(b.stTax + b.ltTax, 2)
+    expect(computeNetTax(funds, 'taxable_brokerage', DEFAULT_RATES)).toBeCloseTo(b.total, 2)
+  })
+})
+
+describe('computeNetTaxBreakdown — taxable brokerage, cross-category netting: an ST LOSS absorbed by a larger LT GAIN', () => {
+  // The exact case a naive "netST * st_rate + netLT * lt_rate" gets wrong.
+  // netSTGain = -500, netLTGain = +1000, net taxable = 500 — all attributed
+  // to the LT rate (there is no positive ST gain to attribute anything to),
+  // so the real tax is 500 * 0.15 = $75, NOT (-500*0.24 + 1000*0.15) = $30.
+  const funds = [
+    { est_st_gain_loss: -500, est_lt_gain_loss: 0, sell_amount: 4000 },
+    { est_lt_gain_loss: 1000, est_st_gain_loss: 0, sell_amount: 6000 },
+  ]
+  const b = computeNetTaxBreakdown(funds, 'taxable_brokerage', DEFAULT_RATES)
+
+  test('taxableAtST is 0 — a net ST loss can never produce positive ST-attributed tax', () => {
+    expect(b.netSTGain).toBeCloseTo(-500, 2)
+    expect(b.taxableAtST).toBe(0)
+    expect(b.stTax).toBe(0)
+  })
+
+  test('the entire $500 net taxable amount is attributed to the LT rate — real total is $75, not the naive $30', () => {
+    expect(b.taxableAtLT).toBeCloseTo(500, 2)
+    expect(b.ltTax).toBeCloseTo(75, 2)
+    expect(b.total).toBeCloseTo(75, 2)
+    const naiveWrongTotal = -500 * 0.24 + 1000 * 0.15
+    expect(b.total).not.toBeCloseTo(naiveWrongTotal, 2)
+  })
+
+  test('stTax + ltTax === total exactly — the display consistency guarantee', () => {
+    expect(b.stTax + b.ltTax).toBeCloseTo(b.total, 2)
+  })
+
+  test('computeNetTax() (the existing 6-call-site wrapper) still returns exactly this same total — no regression from the refactor', () => {
+    expect(computeNetTax(funds, 'taxable_brokerage', DEFAULT_RATES)).toBeCloseTo(b.total, 2)
+  })
+})
+
+describe('computeNetTaxBreakdown — taxable brokerage, the mirror case: an ST GAIN outweighing an LT LOSS', () => {
+  // netSTGain = 1000, netLTGain = -300, net taxable = 700 — entirely
+  // attributed to the ST rate. Real tax = 700 * 0.24 = $168, not the naive
+  // (1000*0.24 + -300*0.15) = $195.
+  const funds = [
+    { est_st_gain_loss: 1000, est_lt_gain_loss: -300, sell_amount: 5000 },
+  ]
+  const b = computeNetTaxBreakdown(funds, 'taxable_brokerage', DEFAULT_RATES)
+
+  test('taxableAtLT is 0, entire taxable amount attributed to ST', () => {
+    expect(b.taxableAtLT).toBe(0)
+    expect(b.ltTax).toBe(0)
+    expect(b.taxableAtST).toBeCloseTo(700, 2)
+  })
+
+  test('real total is $168, not the naive $195', () => {
+    expect(b.total).toBeCloseTo(168, 2)
+    const naiveWrongTotal = 1000 * 0.24 + -300 * 0.15
+    expect(b.total).not.toBeCloseTo(naiveWrongTotal, 2)
+    expect(computeNetTax(funds, 'taxable_brokerage', DEFAULT_RATES)).toBeCloseTo(168, 2)
+  })
+})
+
+describe('computeNetTaxBreakdown — taxable brokerage, pure loss (both categories negative)', () => {
+  test('total is exactly 0 — a net loss owes no tax, both attributions are 0', () => {
+    const funds = [
+      { est_st_gain_loss: -200, est_lt_gain_loss: -400, sell_amount: 1000 },
+    ]
+    const b = computeNetTaxBreakdown(funds, 'taxable_brokerage', DEFAULT_RATES)
+    expect(b.taxableAtST).toBe(0)
+    expect(b.taxableAtLT).toBe(0)
+    expect(b.stTax).toBe(0)
+    expect(b.ltTax).toBe(0)
+    expect(b.total).toBe(0)
+    expect(computeNetTax(funds, 'taxable_brokerage', DEFAULT_RATES)).toBe(0)
+  })
+})
+
+describe('computeNetTaxBreakdown — taxable brokerage, single fund', () => {
+  test('a single fund with only an ST gain — LT side is all zero, no netting story', () => {
+    const funds = [{ est_st_gain_loss: 264.46, est_lt_gain_loss: 0, sell_amount: 2400 }]
+    const b = computeNetTaxBreakdown(funds, 'taxable_brokerage', DEFAULT_RATES)
+    expect(b.netSTGain).toBeCloseTo(264.46, 2)
+    expect(b.netLTGain).toBe(0)
+    expect(b.stTax).toBeCloseTo(264.46 * 0.24, 2)
+    expect(b.ltTax).toBe(0)
+    expect(b.total).toBeCloseTo(b.stTax, 2)
+  })
+})
+
+describe('computeNetTaxBreakdown — multi-fund sums net gain/loss correctly across three funds, mixed signs within a category', () => {
+  test('three funds contribute to ST (two positive, one negative) — net is the real sum, not just the largest term', () => {
+    const funds = [
+      { est_st_gain_loss: 200, est_lt_gain_loss: 0, sell_amount: 1000 },
+      { est_st_gain_loss: 300, est_lt_gain_loss: 0, sell_amount: 1000 },
+      { est_st_gain_loss: -100, est_lt_gain_loss: 0, sell_amount: 1000 },
+    ]
+    const b = computeNetTaxBreakdown(funds, 'taxable_brokerage', DEFAULT_RATES)
+    expect(b.netSTGain).toBeCloseTo(400, 2)
+    expect(b.taxableAtST).toBeCloseTo(400, 2)
+    expect(b.total).toBeCloseTo(400 * 0.24, 2)
+  })
+})
+
+describe('computeNetTaxBreakdown — Traditional IRA', () => {
+  test('single fund: ordinaryIncomeTax = total withdrawal × st_rate, equals total, gain/loss fields are irrelevant to the figure', () => {
+    const funds = [{ est_st_gain_loss: -50, est_lt_gain_loss: 999, sell_amount: 10000 }]
+    const b = computeNetTaxBreakdown(funds, 'traditional_IRA', DEFAULT_RATES)
+    expect(b.totalWithdrawal).toBeCloseTo(10000, 2)
+    expect(b.ordinaryIncomeTax).toBeCloseTo(2400, 2)
+    expect(b.total).toBeCloseTo(2400, 2)
+    expect(b.stTax).toBe(0)
+    expect(b.ltTax).toBe(0)
+    expect(computeNetTax(funds, 'traditional_IRA', DEFAULT_RATES)).toBeCloseTo(2400, 2)
+  })
+
+  test('multi-fund: totalWithdrawal sums sell_amount across every fund, not just one', () => {
+    const funds = [
+      { est_st_gain_loss: 0, est_lt_gain_loss: 0, sell_amount: 80000 },
+      { est_st_gain_loss: 0, est_lt_gain_loss: 0, sell_amount: 70000 },
+    ]
+    const b = computeNetTaxBreakdown(funds, 'traditional_IRA', DEFAULT_RATES)
+    expect(b.totalWithdrawal).toBeCloseTo(150000, 2)
+    expect(b.total).toBeCloseTo(150000 * 0.24, 2)
+  })
+})
+
+describe('computeNetTaxBreakdown — Roth IRA and unresolved account type', () => {
+  test('Roth IRA: total, ordinaryIncomeTax, stTax, ltTax are all exactly 0 regardless of real gains', () => {
+    const funds = [{ est_st_gain_loss: 5000, est_lt_gain_loss: 3000, sell_amount: 20000 }]
+    const b = computeNetTaxBreakdown(funds, 'roth_IRA', DEFAULT_RATES)
+    expect(b.total).toBe(0)
+    expect(b.ordinaryIncomeTax).toBe(0)
+    expect(b.stTax).toBe(0)
+    expect(b.ltTax).toBe(0)
+    // netSTGain/netLTGain/taxableAtST/taxableAtLT are still the real sums —
+    // only the tax fields are zeroed, since Roth's breakdown panel (item 5)
+    // needs the real withdrawal total even though the tax owed is $0.
+    expect(b.netSTGain).toBeCloseTo(5000, 2)
+    expect(b.totalWithdrawal).toBeCloseTo(20000, 2)
+  })
+
+  test('unresolved account type (undefined) falls through to the same 0 branch as Roth, not a crash', () => {
+    const funds = [{ est_st_gain_loss: 100, est_lt_gain_loss: 100, sell_amount: 1000 }]
+    const b = computeNetTaxBreakdown(funds, undefined, DEFAULT_RATES)
+    expect(b.total).toBe(0)
   })
 })

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Sparkles, PenLine } from 'lucide-react'
 import { CoachMark } from '../components/CoachMark'
+import { FundSelectionAssistantEntry } from '../components/FundSelectionAssistantEntry'
 import { useAppStore } from '../store/useAppStore'
 import { loadPortfolio } from '../data/loader'
 import { formatCurrency } from '../utils/format'
@@ -9,7 +10,7 @@ import { formatCurrency } from '../utils/format'
 export default function FundSelectionEntry() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { mode: storeMode, setTargetSaleAmount, setMode, startNewScenario, resetSession, setPortfolio } = useAppStore()
+  const { mode: storeMode, setTargetSaleAmount, setMode, startNewScenario, resetSession, setPortfolio, setDemoSettings, seedScenariosOnce } = useAppStore()
 
   // /?reset=true — clears all localStorage and in-memory session state, then redirects to /
   useEffect(() => {
@@ -19,6 +20,38 @@ export default function FundSelectionEntry() {
       window.dispatchEvent(new Event('vsr-reset'))
       setPortfolio(loadPortfolio())  // reload canonical dataset into Zustand store
       resetSession()
+      // Explicitly clear scenarios and mark seeding as already-done (D109) —
+      // resetSession() deliberately does NOT touch scenarios (see its own
+      // comment in useAppStore.ts; it's also called from ExecutionSummary.tsx
+      // after every completed transaction, where wiping saved comparison
+      // scenarios would be wrong). But this flow starts from a genuine hard
+      // reload (window.location.href, DemoSettingsDialog.tsx), which resets
+      // scenarios/scenariosSeeded to their in-memory defaults regardless —
+      // scenarios has no persist() (same as most of this store). Left alone,
+      // the next /scenarios visit would see scenariosSeeded: false and
+      // legitimately reseed the 3 canonical demo scenarios, exactly as a
+      // genuine first-ever visit should — except this isn't that; it's a
+      // deliberate reset, and "Reset demo" already clears comparably scoped
+      // data (transactions, coach marks). seedScenariosOnce([]) marks
+      // seeding as done with an empty result, so the next visit correctly
+      // shows "No scenarios to compare" instead of silently restoring the 3
+      // canonical scenarios the user may have just explicitly deleted.
+      seedScenariosOnce([])
+      // Provider choices revert to the real env-var default on a full reset
+      // (D073) — going through the store's own setter, not a standalone
+      // localStorage write, so the in-memory demoSettings updates too (this
+      // reset flow uses client-side navigate() below, not a real page
+      // reload, so nothing else would pick up a localStorage-only change).
+      // Segment intentionally does NOT reset here — it's a UI-tone
+      // preference, not demo data (D071's original reasoning, unchanged).
+      // Tax bracket selection also resets (D081): resetSession() above
+      // doesn't clear activeTaxRates, but this whole flow began with a real
+      // hard navigation to /?reset=true, so the store already reinitialized
+      // to its default activeTaxRates (24%/15%) before this effect ever
+      // ran — leaving a stale persisted filing-status/income-band pair
+      // would reopen the dialog showing a selection that no longer matches
+      // the actual reset rate. Same reasoning as providers, not segment.
+      setDemoSettings({ narrationProvider: null, whatifProvider: null, taxBracketFilingStatus: null, taxBracketIncomeMin: null })
       navigate('/', { replace: true })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -101,6 +134,16 @@ export default function FundSelectionEntry() {
           </div>
         </div>
 
+        {/* Assistant entry point — visible only while nothing has been
+            specified yet (no valid nonzero amount), reactive to the same
+            live amountDollars state "Get recommendation" already uses, not
+            a separate "has been shown" flag. This is the actual first-visit
+            landing page (route "/") — distinct from FundSelectionAutomated.tsx
+            (route "/automated", reached only after a first submission here)
+            — see DECISIONS.md's fund-selection-assistant-entry-gap entry for
+            why this file was missed in the original pass. */}
+        {!hasAmount && <FundSelectionAssistantEntry />}
+
         {/* Row 2 — Amount input + CTA */}
         <div className="flex items-end gap-3 px-8">
           <div className="flex flex-col gap-2">
@@ -136,7 +179,7 @@ export default function FundSelectionEntry() {
 
         {/* Explanation text */}
         <div className="px-8">
-          <p className="text-[14px] text-vg-ink-muted leading-normal max-w-[1111px]">
+          <p className="text-[14px] text-vg-ink-muted leading-normal">
             Enter the amount you&apos;d like to raise from your portfolio. We&apos;ll generate a
             fund sell recommendation that minimizes your tax impact while keeping your portfolio on
             target.

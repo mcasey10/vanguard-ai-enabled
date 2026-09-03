@@ -76,10 +76,15 @@ function buildFundDisplay(
   lt_gain_loss: number,
   stRate: number,
   ltRate: number,
+  isTaxableBrokerage: boolean,
 ): FundDisplay {
   const netGainLoss = r2(st_gain_loss + lt_gain_loss)
-  // Gross per-fund tax: positive gains × active rate (losses don't generate tax)
-  const estTax = r2(Math.max(0, st_gain_loss) * stRate + Math.max(0, lt_gain_loss) * ltRate)
+  // Gross per-fund tax: positive gains × active rate (losses don't generate
+  // tax) — applies only to taxable brokerage, same gate as
+  // engine/index.ts's buildFundResult() (D057).
+  const estTax = isTaxableBrokerage
+    ? r2(Math.max(0, st_gain_loss) * stRate + Math.max(0, lt_gain_loss) * ltRate)
+    : 0
 
   let holdingPeriod: FundDisplay['holdingPeriod'] = 'none'
   if (st_gain_loss !== 0 && lt_gain_loss !== 0) holdingPeriod = 'mixed'
@@ -152,8 +157,9 @@ function FundRow({ fd }: { fd: FundDisplay }) {
 }
 
 function TransactionCard({ txn, acctMasked, stRate, ltRate }: { txn: TransactionRecord; acctMasked: string; stRate: number; ltRate: number }) {
+  const isTaxableBrokerage = (txn.account_type ?? 'taxable_brokerage') === 'taxable_brokerage'
   const funds = txn.funds_sold.map(f =>
-    buildFundDisplay(f.fund_id, f.sell_amount, f.accounting_method, f.st_gain_loss ?? 0, f.lt_gain_loss ?? 0, stRate, ltRate)
+    buildFundDisplay(f.fund_id, f.sell_amount, f.accounting_method, f.st_gain_loss ?? 0, f.lt_gain_loss ?? 0, stRate, ltRate, isTaxableBrokerage)
   )
   const totalSold = r2(funds.reduce((s, f) => s + f.sell_amount, 0))
   const effectiveRateDisplay = fmtPct2(txn.effective_rate)
@@ -228,9 +234,9 @@ export default function TransactionHistory() {
   const stRate  = Math.round(activeTaxRates.st_rate * 100)
   const ltRate  = Math.round(activeTaxRates.lt_rate * 100)
 
-  // Account masked number from portfolio
+  // Fallback account (taxable) — used per-transaction below when a
+  // transaction predates account_type tracking (D057).
   const acct = portfolio?.accounts.find(a => a.account_type === 'taxable_brokerage')
-  const acctMasked = acct?.masked_number ?? '...4782'
 
   return (
     <div className="flex flex-col items-start w-full px-[32px] py-[24px] gap-[24px]">
@@ -285,9 +291,15 @@ export default function TransactionHistory() {
           </div>
         ) : (
           <div className="flex flex-col items-start w-full divide-y divide-[#e8e9e9]">
-            {history.map((txn, i) => (
-              <TransactionCard key={txn.transaction_id ?? i} txn={txn} acctMasked={acctMasked} stRate={activeTaxRates.st_rate} ltRate={activeTaxRates.lt_rate} />
-            ))}
+            {history.map((txn, i) => {
+              // Each transaction's own account (D057) — was a single
+              // page-level constant hardcoded to Taxable Brokerage, showing
+              // the wrong masked number for any IRA/Roth transaction.
+              const txnAcct = portfolio?.accounts.find(a => a.account_id === txn.account_id) ?? acct
+              return (
+                <TransactionCard key={txn.transaction_id ?? i} txn={txn} acctMasked={txnAcct?.masked_number ?? '...4782'} stRate={activeTaxRates.st_rate} ltRate={activeTaxRates.lt_rate} />
+              )
+            })}
           </div>
         )}
       </div>

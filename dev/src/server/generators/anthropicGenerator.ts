@@ -46,7 +46,7 @@ export const anthropicGenerator: NarrationGenerator = {
     }
 
     if (!res.ok) {
-      throw new NarrationApiError(`Anthropic API returned ${res.status}`)
+      throw new NarrationApiError(`Anthropic API returned ${res.status}`, res.status)
     }
 
     const body = await res.json() as { content?: Array<{ type: string; text?: string }> }

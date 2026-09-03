@@ -15,6 +15,7 @@ import type {
   TaxAssumptionSet,
 } from '../types'
 import { formatCurrency } from './format'
+import { computeNetTax } from '../engine/index'
 
 // ---------------------------------------------------------------------------
 // Duplicate detection — same optimization priority, fund IDs, sell amounts
@@ -102,7 +103,8 @@ function generateTradeoffSummary(
 export function buildScenarioFromRecommendation(
   rec: Recommendation,
   portfolio: Portfolio | null,
-  activeTaxRates: Pick<TaxAssumptionSet, 'st_rate' | 'lt_rate'>
+  activeTaxRates: Pick<TaxAssumptionSet, 'st_rate' | 'lt_rate'>,
+  activeAccountId?: string
 ): SavedScenario {
   const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -148,11 +150,15 @@ export function buildScenarioFromRecommendation(
     selection_timestamp: new Date().toISOString(),
   }
 
+  const account = portfolio?.accounts.find(a => a.account_id === activeAccountId)
+
   return {
     scenario_id: `sc-auto-${Date.now()}`,
     scenario_name: 'Scenario',
     source_mode: 'automated',
     optimization_priority: rec.optimization_priority,
+    account_id: account?.account_id,
+    account_type: account?.account_type,
     fund_selections: fundSelections,
     total_sell_amount,
     projected_st_gains,
@@ -176,11 +182,20 @@ export function buildScenarioFromFundResults(
   fundResults: FundSaleResult[],
   portfolio: Portfolio | null,
   activeTaxRates: Pick<TaxAssumptionSet, 'st_rate' | 'lt_rate'>,
-  allocationImpact: NonNullable<Recommendation['allocation_impact']> | null
+  allocationImpact: NonNullable<Recommendation['allocation_impact']> | null,
+  activeAccountId?: string
 ): SavedScenario | null {
   if (fundResults.length === 0) return null
 
   const r2 = (n: number) => Math.round(n * 100) / 100
+
+  // Looked up early (not just for the account_id/account_type fields near the
+  // return below) — needed to gate the capital-gains net-tax computation
+  // just below, the same way buildFundResult() already gates est_tax_gross
+  // per-fund. Missing here was a real bug (D057): it showed a nonzero net
+  // tax for a Roth IRA scenario, once account switching made a non-taxable
+  // manual-mode scenario reachable for the first time.
+  const account = portfolio?.accounts.find(a => a.account_id === activeAccountId)
 
   const fundSelections = fundResults.map(fr => ({
     fund_id: fr.fund_id,
@@ -201,10 +216,18 @@ export function buildScenarioFromFundResults(
   const losses_harvested   = r2(fundResults.reduce((s, fr) => s + Math.min(0, fr.est_st_gain_loss) + Math.min(0, fr.est_lt_gain_loss), 0))
   const net_taxable_gain   = r2(projected_st_gains + projected_lt_gains + losses_harvested)
 
-  // Compute federal tax: net gain × weighted rate
-  const stNetGain = r2(Math.min(net_taxable_gain, Math.max(0, projected_st_gains)))
-  const ltNetGain = r2(Math.max(0, net_taxable_gain - stNetGain))
-  const est_net_tax = r2(stNetGain * activeTaxRates.st_rate + ltNetGain * activeTaxRates.lt_rate)
+  // Portfolio-level net tax — the same shared three-way branch
+  // (taxable_brokerage / traditional_IRA / roth_IRA) engine/index.ts's
+  // runOptimization() uses, not a second hand-copied implementation. This
+  // used to be its own two-way taxable/non-taxable gate here, which meant
+  // it was never updated when Traditional IRA's ordinary-income tax was
+  // added to the engine — a real "two places computing the same fact"
+  // drift bug (see DECISIONS.md's Manual mode IRA tax fix entry).
+  // computeNetTax() itself treats an unresolved account_type (undefined,
+  // possible only for a bad activeAccountId) the same as roth_IRA — $0 —
+  // matching this codebase's precedent of never defaulting to a real tax
+  // charge for an unresolved account.
+  const est_net_tax = computeNetTax(fundResults, account?.account_type, activeTaxRates)
   const effective_rate = total_sell_amount > 0 ? est_net_tax / total_sell_amount : 0
 
   // Use provided allocationImpact or derive from portfolio if available
@@ -237,6 +260,8 @@ export function buildScenarioFromFundResults(
     scenario_id: `sc-manual-${Date.now()}`,
     scenario_name: 'Scenario',
     source_mode: 'manual',
+    account_id: account?.account_id,
+    account_type: account?.account_type,
     fund_selections: fundSelections,
     total_sell_amount,
     projected_st_gains,
