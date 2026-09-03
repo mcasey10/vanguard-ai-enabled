@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vanguard AI-Enabled Sell & Rebalance — Progress</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --border: #e2e5ea;
+    --text: #1c2430;
+    --text-dim: #5b6472;
+    --accent: #7c1d3f;
+    --accent-soft: #fbe9ee;
+    --blue: #1d4d8c;
+    --blue-soft: #e9f0fb;
+    --green: #1f7a4d;
+    --green-soft: #e6f4ec;
+    --amber: #a35b00;
+    --amber-soft: #fdf1e2;
+    --red: #b3261e;
+    --red-soft: #fbe9e8;
+    --grey: #6b7280;
+    --grey-soft: #eef0f2;
+    --purple: #6b21a8;
+    --purple-soft: #f3e8fa;
+    --code-bg: #f0f1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  header.page-header {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  header.page-header .eyebrow {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  header.page-header h1 {
+    margin: 0 0 10px;
+    font-size: 30px;
+    letter-spacing: -0.01em;
+  }
+  header.page-header p.tagline {
+    margin: 0 0 14px;
+    color: var(--text-dim);
+    font-size: 16px;
+    max-width: 640px;
+  }
+  header.page-header .generated {
+    display: inline-block;
+    font-size: 13px;
+    color: var(--text-dim);
+    background: var(--grey-soft);
+    padding: 4px 10px;
+    border-radius: 5px;
+  }
+  section {
+    margin-bottom: 40px;
+  }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-intro {
+    color: var(--text-dim);
+    font-size: 14.5px;
+    margin: -8px 0 16px;
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 700px) {
+    .feature-grid { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card h3 {
+    margin: 0 0 8px;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .status-pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 9px;
+    border-radius: 100px;
+  }
+  .status-complete { background: var(--green-soft); color: var(--green); }
+  .status-progress { background: var(--amber-soft); color: var(--amber); }
+  .status-notstarted { background: var(--grey-soft); color: var(--grey); }
+  .status-gap { background: var(--red-soft); color: var(--red); }
+  .card p { margin: 8px 0; color: var(--text-dim); font-size: 14.5px; }
+  .card ul { margin: 10px 0 0; padding-left: 20px; font-size: 14.5px; color: var(--text-dim); }
+  .card ul li { margin-bottom: 5px; }
+  code {
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: "SF Mono", Consolas, Menlo, monospace;
+  }
+  .test-summary {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .test-numbers { display: flex; gap: 20px; }
+  .test-number { text-align: center; }
+  .test-number .n { font-size: 30px; font-weight: 700; color: var(--green); }
+  .test-number .l { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .test-summary p { margin: 0; color: var(--text-dim); font-size: 14.5px; flex: 1; min-width: 260px; }
+  .highlights { display: grid; gap: 12px; }
+  .highlight {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .highlight.design-lesson { border-left-color: var(--blue); }
+  .highlight .h-title { font-weight: 700; font-size: 14.5px; margin-bottom: 4px; }
+  .highlight p { margin: 0; color: var(--text-dim); font-size: 14px; }
+  .open-list {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .open-list ul { margin: 0; padding-left: 20px; font-size: 14.5px; }
+  .open-list li { margin-bottom: 14px; color: var(--text); }
+  .open-list li span.dim { color: var(--text-dim); }
+  .improvement-group-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); margin: 18px 0 8px; }
+  .improvement-group-label:first-child { margin-top: 0; }
+  .item-tag { display: block; width: fit-content; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 100px; margin-bottom: 5px; }
+  .tag-ready { background: var(--green-soft); color: var(--green); }
+  .tag-decision { background: var(--amber-soft); color: var(--amber); }
+  .tag-limitation { background: var(--grey-soft); color: var(--grey); }
+  .tag-roadmap { background: var(--purple-soft); color: var(--purple); }
+  .tag-manual { background: var(--red-soft); color: var(--red); }
+  .tag-verify { background: var(--blue-soft); color: var(--blue); }
+  .tag-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 14px; font-size: 12px; color: var(--text-dim); }
+  .tag-legend .legend-item { display: flex; align-items: center; gap: 6px; }
+  .audit-table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  table.audit-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+  table.audit-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.audit-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+  table.audit-table tr:last-child td { border-bottom: none; }
+  table.audit-table td.rule { font-weight: 700; white-space: nowrap; }
+  .audit-note { margin: 12px 0 0; color: var(--text-dim); font-size: 13.5px; }
+  .roadmap-table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  table.roadmap-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
+  table.roadmap-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.roadmap-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); font-size: 13px; }
+  table.roadmap-table tr:last-child td { border-bottom: none; }
+  table.roadmap-table tr.illustrative td { color: var(--text-dim); font-style: italic; }
+  table.roadmap-table td.priority { font-weight: 700; white-space: nowrap; }
+  .landscape-table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
+  table.landscape-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+  table.landscape-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.landscape-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); font-size: 13px; }
+  table.landscape-table tr:last-child td { border-bottom: none; }
+  table.landscape-table td.approach { font-weight: 700; white-space: nowrap; }
+  .lc-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+  .lc-built .lc-dot, .legend-dot.built { background: var(--green); }
+  .lc-rejected .lc-dot, .legend-dot.rejected { background: var(--amber); }
+  .lc-notused .lc-dot, .legend-dot.notused { background: var(--grey); }
+  .spectrum-outer { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .spectrum-axis-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-dim); }
+  .spectrum-axis-label.top { margin-bottom: 10px; }
+  .spectrum-axis-label.mid { margin: 22px 0 12px; }
+  .footprint-band { display: flex; flex-direction: column; gap: 8px; border: 2px dashed var(--green); border-radius: 10px; background: var(--green-soft); padding: 26px 10px 10px; position: relative; }
+  .footprint-caption { position: absolute; top: 7px; left: 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--green); white-space: nowrap; }
+  .spectrum-node { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); }
+  .footprint-band .spectrum-node { background: rgba(255,255,255,0.6); }
+  .spectrum-dot { width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--panel); box-shadow: 0 0 0 1.5px currentColor; flex-shrink: 0; }
+  .spectrum-node.built .spectrum-dot { background: var(--green); color: var(--green); }
+  .spectrum-node.rejected .spectrum-dot { background: var(--amber); color: var(--amber); }
+  .spectrum-node.notused .spectrum-dot { background: var(--grey); color: var(--grey); }
+  .spectrum-text { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .spectrum-label { font-size: 13px; font-weight: 700; color: var(--text); }
+  .spectrum-status { font-size: 11.5px; color: var(--text-dim); }
+  .spectrum-columns { display: flex; gap: 16px; align-items: flex-start; }
+  .spectrum-column { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .spectrum-column-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .spectrum-column-header.rejected { color: var(--amber); }
+  .spectrum-column-header.notused { color: var(--grey); }
+  @media (max-width: 640px) { .spectrum-columns { flex-direction: column; } }
+  .spectrum-legend { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 18px; font-size: 12px; color: var(--text-dim); }
+  .spectrum-legend .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .spectrum-note { margin: 10px 0 0; color: var(--text-dim); font-size: 12.5px; }
+  .checklist-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .checklist-wrap ol { margin: 0; padding-left: 22px; font-size: 14.5px; }
+  .checklist-wrap ol li { margin-bottom: 16px; color: var(--text); }
+  .checklist-wrap ol li:last-child { margin-bottom: 0; }
+  .checklist-wrap p.step-note { margin: 4px 0 0; color: var(--text-dim); font-size: 13.5px; }
+  .step-flag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 100px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .step-flag.manual { background: var(--red-soft); color: var(--red); }
+  .step-flag.confirm { background: var(--amber-soft); color: var(--amber); }
+  .audit-result-box {
+    background: var(--green-soft);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .audit-result-box .art { font-weight: 700; color: var(--green); font-size: 14.5px; margin-bottom: 6px; }
+  .audit-result-box p { margin: 0; color: var(--text); font-size: 13.5px; }
+  .audit-result-box ul { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; color: var(--text); }
+  footer.pointer {
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  footer.pointer code { font-size: 0.95em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-header">
+    <div class="eyebrow">Vanguard AI-Enabled Sell &amp; Rebalance</div>
+    <h1>Project progress</h1>
+    <p class="tagline">Adds an embedded AI interpretive/generative layer — narration and a conversational what-if assistant — onto an existing, previously-built Vanguard Sell &amp; Rebalance rebalancing tool. The application logic isn't changing; what's new is the AI layer that sits on top of it.</p>
+    <span class="generated">Last generated 2026-09-03</span>
+  </header>
+
+  <section>
+    <h2>Feature status</h2>
+    <div class="feature-grid">
+      <div class="card">
+        <h3>Feature 1 <span class="status-pill status-complete">Complete</span></h3>
+        <p>AI narration layer, live at all four existing static-text touchpoints: Fund Selection rationale, Scenario Analysis tradeoff summary, Order Confirmation summary, and Execution Summary narrative.</p>
+        <ul>
+          <li>Provider-agnostic architecture — a shared <code>NarrationGenerator</code> interface with a swappable implementation, not tied to one vendor. Three adapters exist and are tested in code (Gemini, Anthropic, Groq); the live Demo Settings dialog currently offers Gemini and Groq only, since this deployment has no configured Anthropic key.</li>
+          <li>Reader-tone segment (A–D) is user-selectable via Demo Settings, not hardcoded. Segments C and D's tone content, found cross-wired relative to their real personas, is corrected and sourced from the same real segment-research module Feature 2 uses; both segments' corrected content are now live-verified against real model output — Segment C (three real calls) and Segment D (five real calls across all four narration touchpoints), which also caught Segment D's own real consistency gap: the same shared "orient before stating specifics" rule was honored at some touchpoints and not others, traced to a real research field that existed but had never actually been used in the prompt.</li>
+          <li>Traditional IRA narration states the real computed ordinary-income tax figure (not just the qualitative rule) and correctly omits the early-withdrawal penalty entirely unless it's ever genuinely nonzero — never a reassuring aside filling the silence.</li>
+          <li>"Breakdown ▾"/"Why? ▾" progressive-disclosure controls on every real tax-figure touchpoint show the engine's actual blended-rate attribution, not a naive re-derivation — closing a real, previously-flagged compliance gap (no control existed for "how was this calculated," even though the figures themselves were always visible).</li>
+          <li>Deterministic text fallback if the live API call fails — never silently blank, never mislabeled as AI-generated.</li>
+          <li>Correct prospective/past tense per touchpoint (proposed sales narrated as "would realize," executed sales as "realized") — a real tense bug found and fixed after shipping.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Feature 2 <span class="status-pill status-complete">Complete</span></h3>
+        <p>AI-assisted "what-if" exploration — a "Scenario assistant" reachable both from Scenario Analysis's own header button and, now, directly from Fund Selection before an amount is even entered, opening the same drawer with an in-panel segmented control ("New" plus one option per existing scenario) for natural-language scenario building and editing.</p>
+        <ul>
+          <li>Interpret → clarify → confirm loop: the engine is only ever called after the user confirms a plain-language interpretation of their request — no numeric preview exists before that point.</li>
+          <li>Real reader-segment tone (built fresh from the same segment-research module as Feature 1) and runtime-switchable provider selection, both driven by the Demo Settings dialog rather than a hardcoded default.</li>
+          <li>Calls the same calculation engine Fund Selection already uses, directly — no reimplementation of tax/lot logic. Code-level validators (not just prompt instructions) enforce SpecID-unavailable-on-Traditional-IRA, amount-can't-exceed-balance, and that a pre-confirm summary can never leak a computed tax/gain figure before any calculation has run.</li>
+          <li>Can create a new scenario, modify an existing one in place, or build a new scenario from an existing one as reference ("like Scenario 1 but...") — including a cross-account reference ("...but in my Roth IRA"), which correctly grounds any fund/lot in the target account's own real holdings rather than the referenced scenario's.</li>
+          <li>A new entry point on Fund Selection — a bordered banner, styled to a real mockup, visible only while nothing has been specified yet — lets a user skip straight to describing what they want instead of filling in the amount form first. Reaching this newly-exposed path also surfaced and fixed two real pre-existing bugs in how Scenario Analysis seeds its own demo data (see Highlights).</li>
+          <li>Closing the assistant panel mid-conversation now asks for confirmation before discarding an unconfirmed request — it used to happen silently.</li>
+          <li>A two-tone "AI-assisted — [Custom/priority]" badge discloses provenance, sharing the existing scenario badge's pill rather than stacking a second one.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>AI approaches landscape</h2>
+    <p class="section-intro">This project's primary objective is learning to design AI-<em>enabled</em> applications, not just building two features — so knowing the full space of possible approaches, and being deliberate about which ones apply here, is part of the actual work. The table and diagram below map the two shipped features onto that wider landscape, and are equally about what was consciously left out as what was built.</p>
+    <div class="landscape-table-wrap">
+      <table class="landscape-table">
+        <tr><th>Approach</th><th>What it does</th><th>This project</th></tr>
+        <tr class="lc-built"><td class="approach"><span class="lc-dot"></span>Data-to-text / NLG</td><td>Structured facts → natural language</td><td>Feature 1</td></tr>
+        <tr class="lc-built"><td class="approach"><span class="lc-dot"></span>Function calling / tool use</td><td>NL → structured call to a deterministic system</td><td>Feature 2's core mechanism</td></tr>
+        <tr class="lc-built"><td class="approach"><span class="lc-dot"></span>Slot filling</td><td>Multi-turn clarification to fully specify intent before acting</td><td>Feature 2's clarify loop</td></tr>
+        <tr class="lc-built"><td class="approach"><span class="lc-dot"></span>Human-in-the-loop (HITL)</td><td>A human confirms before a consequential action executes</td><td>Feature 2's confirm gate</td></tr>
+        <tr class="lc-notused"><td class="approach"><span class="lc-dot"></span>Retrieval-Augmented Generation (RAG)</td><td>Semantic search over documents, generate grounded in what's retrieved</td><td>Not used — no retrieval step anywhere in this project</td></tr>
+        <tr class="lc-built"><td class="approach"><span class="lc-dot"></span>Classification / routing</td><td>Model categorizes input to decide a downstream path</td><td>Lightly present (fund-specific vs. objective-shaped routing), not a major pattern</td></tr>
+        <tr class="lc-notused"><td class="approach"><span class="lc-dot"></span>Recommendation systems</td><td>Learned, personalized ranking from user data</td><td>Not used — the "System recommendation" badge comes from a deterministic optimizer, not a learned model, despite the name</td></tr>
+        <tr class="lc-rejected"><td class="approach"><span class="lc-dot"></span>Anomaly / fraud detection</td><td>Classification models flagging unusual patterns</td><td>Considered and explicitly rejected (a wash-sale-flagging candidate)</td></tr>
+        <tr class="lc-rejected"><td class="approach"><span class="lc-dot"></span>Multi-step autonomous agents</td><td>A model plans and executes a sequence of actions with minimal checkpoints</td><td>Explicitly not built — deliberately avoided</td></tr>
+        <tr class="lc-notused"><td class="approach"><span class="lc-dot"></span>Multi-agent systems</td><td>Multiple specialized model instances collaborating</td><td>Not used</td></tr>
+        <tr class="lc-notused"><td class="approach"><span class="lc-dot"></span>Fine-tuned / specialized models</td><td>A model trained further on proprietary data</td><td>Not used — general-purpose models only, no fine-tuning</td></tr>
+        <tr class="lc-notused"><td class="approach"><span class="lc-dot"></span>Cross-session memory / personalization</td><td>The system remembers a user's history across visits</td><td>Not used — every call is stateless, built fresh each time</td></tr>
+        <tr class="lc-rejected"><td class="approach"><span class="lc-dot"></span>Predictive / forecasting ML</td><td>Predicting a future value (market movement, retirement outcome)</td><td>Explicitly rejected as a scope mismatch</td></tr>
+      </table>
+    </div>
+
+    <div class="spectrum-outer">
+      <div class="spectrum-axis-label top">↑ Lower autonomy / narrower scope</div>
+      <div class="footprint-band">
+        <span class="footprint-caption">This project's actual footprint</span>
+        <div class="spectrum-node built">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-text"><span class="spectrum-label">Data-to-text / NLG</span><span class="spectrum-status">Feature 1</span></div>
+        </div>
+        <div class="spectrum-node built">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-text"><span class="spectrum-label">Classification / routing</span><span class="spectrum-status">Lightly present</span></div>
+        </div>
+        <div class="spectrum-node built">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-text"><span class="spectrum-label">Function calling / tool use</span><span class="spectrum-status">Feature 2 core</span></div>
+        </div>
+        <div class="spectrum-node built">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-text"><span class="spectrum-label">Slot filling</span><span class="spectrum-status">Feature 2 clarify loop</span></div>
+        </div>
+        <div class="spectrum-node built">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-text"><span class="spectrum-label">Human-in-the-loop</span><span class="spectrum-status">Feature 2 confirm gate</span></div>
+        </div>
+      </div>
+
+      <div class="spectrum-axis-label mid">↓ Higher autonomy / broader scope — not built</div>
+      <div class="spectrum-columns">
+        <div class="spectrum-column">
+          <span class="spectrum-column-header rejected">Considered and explicitly rejected</span>
+          <div class="spectrum-node rejected">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">Anomaly / fraud detection</span>
+          </div>
+          <div class="spectrum-node rejected">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">Predictive / forecasting ML</span>
+          </div>
+          <div class="spectrum-node rejected">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">Multi-step autonomous agents</span>
+          </div>
+        </div>
+        <div class="spectrum-column">
+          <span class="spectrum-column-header notused">Not needed for this project's scope</span>
+          <div class="spectrum-node notused">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">Recommendation systems</span>
+          </div>
+          <div class="spectrum-node notused">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">RAG</span>
+          </div>
+          <div class="spectrum-node notused">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">Fine-tuned models</span>
+          </div>
+          <div class="spectrum-node notused">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">Cross-session memory</span>
+          </div>
+          <div class="spectrum-node notused">
+            <div class="spectrum-dot"></div>
+            <span class="spectrum-label">Multi-agent systems</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="spectrum-legend">
+        <span class="legend-item"><span class="legend-dot built"></span>Built</span>
+        <span class="legend-item"><span class="legend-dot rejected"></span>Considered and explicitly rejected</span>
+        <span class="legend-item"><span class="legend-dot notused"></span>Not needed for this project's scope</span>
+      </div>
+      <p class="spectrum-note">Ordering is approximate — a rough read on autonomy and scope, not a rigorous ranking. The pattern that matters: everything this project built sits at the bounded, human-gated end of the spectrum: every AI decision either produces text describing an already-computed figure, or proposes a structured action that a person must confirm before it runs. Nothing built here ever takes a consequential action on its own — which is also the exact line the roadmap's illustrative "autonomous execution" idea was named to sit on the wrong side of.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Test coverage</h2>
+    <div class="test-summary">
+      <div class="test-numbers">
+        <div class="test-number"><div class="n">296/296</div><div class="l">Vitest</div></div>
+        <div class="test-number"><div class="n">6/6</div><div class="l">Playwright</div></div>
+      </div>
+      <p>All passing, <code>tsc --noEmit</code> clean. Narration covers 14 categories end-to-end against real engine output, plus structural and content coverage for all four reader-tone segments — including two explicit content rules for Segment C (never state the ST/LT breakdown separately, never state per-asset-class allocation shifts), added after real generated output showed brevity alone hadn't stopped either from appearing, and live-verified against three real Gemini calls afterward. The what-if assistant covers 19 categories against a formal eight-dimension coverage matrix, plus a ninth dimension — candidate schema conformance — found only through genuine live model calls, since a hand-authored test double can't spontaneously produce a real model's malformed JSON the way an actual API response can. The provider-failure tracker (shared between both features) has its own 13-test suite: 429-vs-generic wording, per-provider independence, success-clears-immediately, day-rollover staleness, and the date-inclusive display format. Every "confirm" outcome is still checked against the real engine's own output, never a hand-computed expectation.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Standards compliance — CD-1 through CD-6</h2>
+    <p class="section-intro">A systematic audit against PRD 11's conversational design requirements. Full rule-by-rule table lives in <code>CLAUDE.md</code> §6 — this is the headline summary, updated as findings get resolved rather than left as a point-in-time snapshot.</p>
+    <div class="audit-table-wrap">
+      <table class="audit-table">
+        <tr><th>Rule</th><th>Feature 1</th><th>Feature 2</th><th>Headline finding</th></tr>
+        <tr><td class="rule">CD-1.1 assistive, not directive</td><td><span class="status-pill status-complete">Compliant</span></td><td><span class="status-pill status-complete">Compliant</span></td><td>Zero imperative/evaluative language across every reviewed real generation.</td></tr>
+        <tr><td class="rule">CD-1.2 AI transparency</td><td><span class="status-pill status-complete">Compliant</span></td><td><span class="status-pill status-complete">Compliant</span></td><td>Badge-trigger logic confirmed architecturally, not just by test cases — grepped every place either badge flag is ever set.</td></tr>
+        <tr><td class="rule">CD-1.3 human control</td><td><span class="status-pill status-complete">Compliant</span></td><td><span class="status-pill status-complete">Compliant</span></td><td>The engine has exactly one call site in the whole codebase, wired only to the "Confirm" button. The "how was this calculated?" progressive-disclosure control this audit once flagged as missing now exists — "Breakdown ▾"/"Why? ▾" on all six real summary touchpoints.</td></tr>
+        <tr><td class="rule">CD-2.x segment-aware tone</td><td><span class="status-pill status-complete">Both C and D verified</span></td><td><span class="status-pill status-complete">Built</span></td><td>The Segment C/D cross-wire is fixed, and both segments' corrected content are now confirmed compliant against real live model calls — Segment D's own check additionally found and fixed a real consistency gap (the same shared instruction honored at some touchpoints, not others).</td></tr>
+        <tr><td class="rule">CD-3.1 rationale accuracy</td><td><span class="status-pill status-complete">Compliant</span></td><td>N/A</td><td>Architectural, not just tested — narration inputs are always real engine output, never invented.</td></tr>
+        <tr><td class="rule">CD-4.2 calculation/narrative separation</td><td><span class="status-pill status-complete">Compliant</span></td><td><span class="status-pill status-complete">Compliant</span></td><td>The one gap this audit found — no code-level check backing "never a computed figure in the confirm summary" — is closed with a dedicated validator.</td></tr>
+        <tr><td class="rule">CD-5 session continuity</td><td>N/A</td><td>N/A</td><td>Governs deep-link/returning-user language neither AI feature touches — pre-existing app scope, not a gap either feature introduced.</td></tr>
+        <tr><td class="rule">CD-6 feedback loops</td><td><span class="status-pill status-gap">Not implemented</span></td><td><span class="status-pill status-gap">Not implemented</span></td><td>No feedback UI or telemetry infrastructure exists anywhere in this project.</td></tr>
+      </table>
+    </div>
+    <p class="audit-note">The audit itself was a reporting-only pass; the fixes for CD-1.3, CD-2.x, and CD-4.2 all came in later, separate checkpoints. This table's last genuinely open item — Segment D's corrected output never having been run through a real model call the way Segment C's was — is now closed too; see Highlights below.</p>
+  </section>
+
+  <section>
+    <h2>Highlights worth knowing at a glance</h2>
+    <p class="section-intro">Engineering findings — bugs caught, code-level guarantees built, things verified rather than assumed.</p>
+    <div class="highlights">
+      <div class="highlight">
+        <div class="h-title">A "verified live" claim that hadn't actually visited the real front door</div>
+        <p>A new entry point into the Scenario assistant was added to Fund Selection, verified live, and reported working — but the verification had only ever navigated directly to the internal <code>/automated</code> route, never the app's actual root landing page, a genuinely separate component with its own copy and its own button ("Get recommendation," not "Calculate") that the original self-audit had conflated with the page it did check. A user starting from the real front door saw no banner at all. Found by treating a follow-up "this doesn't match what I'm seeing" report as ground truth over the prior write-up, then tracing the actual rendered component tree rather than re-trusting the first pass.</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">A second "it's fixed" claim, undone by Vite's own hot-reload behavior</div>
+        <p>A real bug — Scenario Analysis silently re-populating 3 demo scenarios after they'd been explicitly deleted — was fixed and verified live. A follow-up report said the fix had made things worse, reseeding "regardless of navigation." Direct state tracing (a temporary debug hook reading the store's real values at every step) showed the fix was correct the whole time — real in-app navigation never re-triggered it. The actual cause: the store module had no Vite HMR boundary of its own, so every further code edit silently re-created it from scratch, with no "page reload" line in the dev log to hint why. Fixed by making the store a genuine HMR self-accept boundary — a fix that also protects every other piece of in-memory session state from the same silent reset, not just the one field that happened to expose it.</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">A third real gap, found only because the check didn't stop at the two reported examples</div>
+        <p>Segment D's narration is supposed to orient the reader before naming a specific fund and dollar figure. Reading real generated output cold showed it doing that correctly at Scenario Analysis but not at Fund Selection's per-fund rows — the two touchpoints originally reported. Checking the other two touchpoints anyway (not assumed fine) found Order Confirmation already correct, but Execution Summary silently sharing the same gap as Fund Selection — a third, previously unflagged case. The actual cause: a real research field naming this exact requirement ("orientation before action") had existed since the segment's content was first corrected, but was never actually referenced in the prompt text — only two of its three fields were. Fixed by using it, verified with five fresh real model calls read cold, not just a structural check that the new rule text exists.</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">Real dollars, not just a rule, for Traditional IRA narration</div>
+        <p>Traditional IRA narration used to state only the qualitative rule — "taxed as ordinary income, regardless of this gain/loss figure" — because there was no real computed figure to state until a separate piece of work made that number real. Once it existed, narration was updated to state it plainly ("...an estimated $2,400.00 in this case"), live-verified against a genuine model call. Along the way, a second, unrelated gap turned up: Manual mode's per-fund narration was never even passed the aggregate tax figure at all, so it silently couldn't state one for any account type — fixed in the same pass rather than left for later.</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">A provider-failure indicator that refuses to guess</div>
+        <p>When a live AI call fails, a real HTTP 429 is a reliable "you've hit a usage limit" signal — already seen twice for real in this project. Anything else (a bad key, a network failure, a malformed request) isn't, and the indicator now added to Demo Settings says so honestly: specific wording only for a confirmed 429, generic wording otherwise, never a guess dressed up as a diagnosis. A follow-up pass found the display was missing its date (a bare time alone misreads as "this morning" if ever seen the next day) — fixed, and the underlying assumption that a stale message could never actually render was itself checked rather than taken on faith (see "What's not built yet" below for the one narrow gap that check surfaced).</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">A validator that caught its own designer's mistakes twice before shipping</div>
+        <p>Building a code-level check for "never state a computed tax figure before confirming" sounds simple until it meets a real fund name: the first draft flagged every summary mentioning "MinTax" as if it said "tax." The fixed version then flagged a genuinely correct request ("optimizing for the lowest tax impact") as if that were a computed estimate too. Both were caught by the test suite's own first run, before either version reached the live app.</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">A four-year-old-looking bug that had never once been tested</div>
+        <p>Two of narration's four reader-tone variants — the ones for a stressed, time-pressured reader and a reader who's new to investing — had their actual defining traits swapped: the "explain everything in plain language" content sat on the wrong one, and the "get to the point fast" reader was getting a slower, more explanatory tone instead. It went unnoticed because neither variant had ever been generated, tested, or reviewed even once since the day it was written.</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">Multi-account scenarios: investigated, then actually designed for</div>
+        <p>A live test confirmed a real user can build one scenario against Taxable Brokerage and another against Traditional IRA, coexisting in the same comparison — each computed correctly, but the page's single account label could misattribute an older scenario. That finding is now closed: each scenario shows its own account on its own column, and the assistant's panel shows a summary card confirming which account and scenario it's currently touching.</p>
+      </div>
+      <div class="highlight">
+        <div class="h-title">Account switching: real, and it found a systemic bug</div>
+        <p>Enabling the previously-decorative Taxable/Traditional IRA/Roth IRA account selector was the first time a non-taxable account was reachable at all — which surfaced a pre-existing, project-wide bug: ~10 call sites across 5 files computed capital-gains tax unconditionally, with no gate on account type. Found and fixed, with the gate now a documented required pattern for any new tax computation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Design lessons</h2>
+    <p class="section-intro">This project's stated primary purpose is learning to design AI-<em>enabled</em> applications, not just build them — so what changed in how AI-enabled products should be designed matters as much as what was fixed in code. These are distinct from the engineering findings above, not a restatement of the bug each one happened to surface alongside.</p>
+    <div class="highlights">
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 1</div>
+        <p>Free-text testing has no natural stopping point. The fix, applied to the Scenario assistant's multi-lot selection feature, was enumerating real axes of variation (fund count, account type, cost-basis method, how an amount is specified, ambiguity level) and confirming every meaningful combination was covered — a specific, finite check, not indefinite trial and error.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 2</div>
+        <p>Testing whether the assistant could select funds by "smallest embedded gain," an $8,000 test case happened to pick the same fund the system's unrelated default tax-optimization method would have picked anyway — so a correct answer couldn't prove the instruction was actually followed rather than ignored. A $30,000 case that forced a real multi-fund split was the one that actually proved the capability.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 3</div>
+        <p>Researching SEC guidance on investment advice showed the real line isn't "no algorithmic recommendations" — this app's existing tax-optimization recommendation already is one. The line is adding a new, generative, forward-looking layer of directive language on top of an already-deterministic recommendation, which is what the narration and assistant features were deliberately designed never to do.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 4</div>
+        <p>Because the narration layer was never allowed to influence a computed tax or gain figure, two later features — letting a demo viewer preview different tone styles, and switching between Gemini/Groq/Anthropic — both worked cheaply, needing only new adapters, because neither one risked touching the numbers underneath.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 5</div>
+        <p>This project's own user-research documentation explicitly warned that a proxy signal like login count doesn't reliably indicate someone's actual situation. The same risk applied to inferring an investor's persona from which mode or cost-basis method they picked — so an explicit, honest "preview as" control was built instead of a confident-but-likely-wrong automatic classifier.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 6</div>
+        <p>A user-research note said one investor persona should avoid unnecessary complexity, like comparing scenarios. Read literally, that could have meant hiding the Scenario Analysis feature for that persona entirely — a much stronger and riskier move than what the research actually intended, which was about not proactively pushing it as a default, not removing it as an option.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 7</div>
+        <p>The per-fund "Impact" badge on Fund Selection was assumed to be colored based on whether a trade moves an allocation toward or away from its target — a reasonable-sounding guess. When actually traced in the code, it turned out to be a fixed rule based only on the sign of the raw change, with no target percentage anywhere in the calculation. That means a Manual-mode sale that makes an already-underweight position even more underweight could still show a green badge. The catch mattered because the wrong assumption was about to be relied on while designing the new IRA summary banner — verifying it first meant that design never got built on a false premise.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 8</div>
+        <p>Mapping this project's two features against roughly a dozen real AI-industry patterns — including ones deliberately not used, like retrieval-augmented generation, multi-agent systems, and autonomous execution — and being able to explain why each one was or wasn't the right fit is itself evidence of design judgment, separate from the two features actually built.</p>
+      </div>
+      <div class="highlight design-lesson">
+        <div class="h-title">Lesson 9</div>
+        <p>Two separate "verified live" reports — a UI banner and a scenario-seeding fix — each turned out not to match what an independent, direct look actually showed, in a live-editing dev environment where hot-reload activity happens constantly between one check and the next. The fix in both cases wasn't a better screenshot; it was tracing the actual mechanism (which component tree really rendered, what the real store state was at each step) rather than re-trusting an earlier, plausible-looking pass. A live check is only as strong as what it actually exercised — which page, which navigation path, which moment relative to the last edit — not just that something rendered correctly once.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Improvements to the underlying application</h2>
+    <p class="section-intro">Not every fix made during this project was about AI. Several of the most consequential ones are corrections to the base Sell &amp; Rebalance application itself — defects that predate this project, several never even reachable until AI-related work (mainly getting account switching genuinely working, so Feature 2 could reach every account type) was the first thing to actually exercise the code path that had been broken. A real, complementary outcome of the work, not the primary objective — but the underlying application is genuinely more correct today because of it.</p>
+    <div class="open-list">
+      <p class="improvement-group-label">Account switching</p>
+      <ul>
+        <li><strong>The account-type selector was never functional in the original application</strong> — <span class="dim">no click handler existed anywhere, in either mode; wired up for the first time.</span></li>
+        <li><strong>Once wired up, it revealed the app had been silently fabricating tax figures for non-taxable accounts</strong> — <span class="dim">roughly ten independent call sites computed capital-gains tax unconditionally with no account-type check — a live Roth IRA run showed a fabricated $1,818.30 "EST. NET TAX" and a fabricated "you saved $1,090.98" banner on an account that owes no capital-gains tax under any method.</span></li>
+        <li><strong>Two layout-coherence bugs surfaced alongside it</strong> — <span class="dim">a fixed-position fund table could show one account's holdings under a different account's heading, and the account list visually reordered itself on every switch instead of holding still.</span></li>
+        <li><strong>An engine gap: a budget-splitting sale calculation could silently drop part of a requested amount</strong> — <span class="dim">an account with only one qualifying holding left part of the target unsold with no error or warning — a $25,000 request against a single-holding Roth IRA silently returned only $15,000.</span></li>
+        <li><strong>Stale account data could carry over when switching accounts inside Manual mode</strong> — <span class="dim">a React state bug unrelated to anything AI-related: manual-session selections keyed only by fund ticker bled from one account into another, breaking the very next Manual-mode visit.</span></li>
+        <li><strong>A third, distinct Manual-mode bug: the sell amount could vanish entirely</strong> — <span class="dim">switching directly between two non-taxable accounts while already in Manual mode hit a stale-closure trap, computing against the previous account's id even after the store had already updated.</span></li>
+        <li><strong>A dev-only masking issue</strong> — <span class="dim">a React behavior specific to development mode was silently recovering from a real bug that would have shown stale, wrong-account figures with no recovery path in an actual production build.</span></li>
+        <li><strong>"Edit scenario" never restored which account a saved scenario belonged to</strong> — <span class="dim">clicking Edit on a scenario built against one account could silently show a freshly-computed, completely different account's recommendation instead of the actual saved data.</span></li>
+      </ul>
+      <p class="improvement-group-label">Tax accuracy</p>
+      <ul>
+        <li><strong>Traditional IRA withdrawals were never actually taxed as ordinary income anywhere in the app</strong> — <span class="dim">silently treated as tax-free, identical to a Roth IRA; implemented for real, consolidated into one shared calculation used by both Automated and Manual mode, then the display layer redesigned to match across all six real summary touchpoints.</span></li>
+        <li><strong>The tax bracket "Change" control was planned in the original project but never built</strong> — <span class="dim">implemented for the first time, using real, accurate 2026 federal tax bracket data across all three real filing statuses.</span></li>
+      </ul>
+      <p class="improvement-group-label">Display correctness</p>
+      <ul>
+        <li><strong>Order Confirmation had an internally inconsistent account-type display</strong> — <span class="dim">correct in one section of the page, hardcoded to the wrong literal word in another section of the same page.</span></li>
+        <li><strong>Execution Summary never correctly displayed which account a transaction was for</strong> — <span class="dim">its one account mention always showed the same generic, incorrect label regardless of the real account type.</span></li>
+        <li><strong>A footer button-alignment inconsistency between Automated and Manual mode, present since the original project, was corrected</strong> — <span class="dim">Manual mode's own reset/action buttons were left-justified together instead of matching the reset-left, actions-right pattern every other footer in the app already used.</span></li>
+        <li><strong>A layout bug caused fund-row content to overlap adjacent elements in Manual mode</strong> — <span class="dim">a fixed-height container sized for old, short placeholder text cut real content off mid-word once it grew longer than the container had ever anticipated.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>What's not built yet</h2>
+    <p class="section-intro">Each item is tagged with what it actually needs next, checked against its real status rather than assigned generically. What used to be here and no longer is matters too: a "needs a decision" item (a dedicated calculation-transparency control) and a "needs verification" item (Segment C and D's live checks, resolved in two separate passes) both closed since earlier versions of this page — moved into the sections above rather than left with a stale tag. What's genuinely left is now four known, accepted limitations and nothing tagged "needs verification" at all — reaching that state is itself a real milestone for this project, not a sign something was missed.</p>
+    <div class="tag-legend">
+      <span class="legend-item"><span class="item-tag tag-ready" style="margin-bottom:0;">Ready to build</span> fully scoped, just needs a prompt</span>
+      <span class="legend-item"><span class="item-tag tag-decision" style="margin-bottom:0;">Needs a decision first</span> a real design choice is open</span>
+      <span class="legend-item"><span class="item-tag tag-limitation" style="margin-bottom:0;">Known, accepted limitation</span> documented, not currently planned to change</span>
+      <span class="legend-item"><span class="item-tag tag-roadmap" style="margin-bottom:0;">Roadmap idea</span> deliberately out of scope, see roadmap table</span>
+      <span class="legend-item"><span class="item-tag tag-manual" style="margin-bottom:0;">Requires manual action</span> only the user can do this outside Claude Code</span>
+      <span class="legend-item"><span class="item-tag tag-verify" style="margin-bottom:0;">Needs user verification</span> sandbox couldn't fully confirm this</span>
+    </div>
+    <div class="open-list">
+      <ul>
+        <li><span class="item-tag tag-limitation">Known, accepted limitation</span><strong>A narrow gap in the provider-failure indicator's freshness</strong> — <span class="dim">the day-rollover check runs correctly on every fresh page load and every dialog reopen (each is a genuine new render against the real current time), but a Demo Settings dialog left open continuously, unattended, across a real midnight boundary, with no other interaction in it, would keep showing its pre-midnight render until something else triggers a re-render — there's no polling or time subscription forcing a refresh. Narrow and low-likelihood (a demo dialog left open unattended past midnight); explicitly judged not worth adding polling infrastructure for.</span></li>
+        <li><span class="item-tag tag-limitation">Known, accepted limitation</span><strong>A few residual what-if test gaps, documented rather than chased</strong> — <span class="dim">a plain (non-SpecID) request on a Roth IRA, and HIFO tested alone rather than only paired with another method — low risk, since every method involved is already proven correct elsewhere; a deliberate stopping point, not an oversight. (A third gap this note used to list — a cross-account scenario reference being untested — is closed: both the data field it needed and a dedicated test now exist.)</span></li>
+        <li><span class="item-tag tag-limitation">Known, accepted limitation</span><strong>Allocation-impact indicator wording mismatch</strong> — <span class="dim">a minor, unconfirmed discrepancy between the canonical workflow spec's description and the live app's actual display, unrelated to either feature's scope — flagged for whoever eventually touches that indicator, with no current plan to.</span></li>
+        <li><span class="item-tag tag-limitation">Known, accepted limitation</span><strong>CD-6 (feedback loops)</strong> — <span class="dim">no in-session feedback UI or behavioral-telemetry infrastructure exists anywhere in this project; out of this project's two-feature scope rather than an oversight — this project has no backend/analytics layer at all, so the infrastructure this would need was never built by either this project or the one it extends.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Roadmap — scoped, not built</h2>
+    <p class="section-intro">Ideas considered explicitly for a future extension of this project's two-feature scope, not commitments. Ranked by what would demonstrate the most additional embedded-AI depth relative to the effort involved.</p>
+    <div class="roadmap-table-wrap">
+      <table class="roadmap-table">
+        <tr><th>Priority</th><th>Idea</th><th>Product scope</th><th>Feasibility</th><th>Effort</th><th>Example</th></tr>
+        <tr>
+          <td class="priority">1</td>
+          <td>Autonomous drift monitoring</td>
+          <td>A background check that periodically compares the portfolio's actual allocation against its target and proactively surfaces a narrated alert when drift crosses a threshold — without the user having to open Scenario Analysis to notice.</td>
+          <td>High — reuses the existing engine's allocation-delta computation and the existing narration pipeline; the new part is only the trigger/scheduling logic.</td>
+          <td>Small–Medium</td>
+          <td>"Your Bonds allocation has drifted 3.2% from target since your last rebalance — want to see a scenario that corrects it?"</td>
+        </tr>
+        <tr>
+          <td class="priority">2</td>
+          <td>Multi-scenario autonomous exploration</td>
+          <td>Given a single what-if request, generate and narrate several candidate scenarios at once (e.g. tax-first vs. balance-first vs. a blended approach) instead of one at a time, so the user compares options in one pass.</td>
+          <td>Medium — the engine already supports running multiple optimizations; the new work is mostly UI (a multi-column compare view) and prompt design for narrating tradeoffs across options rather than within one.</td>
+          <td>Medium</td>
+          <td>User asks "reduce my tax exposure" → three scenario columns appear side by side, each with its own AI-narrated tradeoff summary.</td>
+        </tr>
+        <tr>
+          <td class="priority">3</td>
+          <td>Multi-agent planner/critic</td>
+          <td>Split the what-if assistant's single interpret step into a planner (proposes a candidate) and a critic (checks it against the same business rules `whatIfValidation.ts` already enforces, but framed as a second model pass rather than only deterministic code) — mainly a demonstration of a second embedded-AI architecture pattern, not a strict improvement over the current code-level validator.</td>
+          <td>Medium — architecturally interesting but the current code-level validator already provides the correctness guarantee a critic model would only partially replace; real value would be in catching softer issues (tone, ambiguity) code can't check.</td>
+          <td>Medium–Large</td>
+          <td>A planner drafts "sell $8,000 of VTSAX," a critic model flags "this exceeds the position's actual balance by $1,200" before it ever reaches the deterministic validator.</td>
+        </tr>
+        <tr>
+          <td class="priority">4</td>
+          <td>RAG-based fund research assistant</td>
+          <td>A retrieval layer over real fund prospectus/fact-sheet content (or this project's own market-context dataset extended with more documents) so the assistant can answer factual "what is VTSAX" questions grounded in real source text, distinct from the what-if assistant's transactional scope.</td>
+          <td>Low-Medium for this project specifically — no real document corpus exists yet, and sourcing/licensing real fund documents is its own project; the dataset's fictional elements (§11) would also need reconciling with real retrieved text.</td>
+          <td>Large</td>
+          <td>"What's VTSAX's expense ratio?" answered from a real retrieved fact sheet, with a citation, rather than left unanswerable.</td>
+        </tr>
+        <tr class="illustrative">
+          <td class="priority">5 (illustrative only)</td>
+          <td>Autonomous execution within a pre-set envelope</td>
+          <td>The system executes a rebalance automatically, without a human confirming each time, once the user has pre-approved a bounded envelope (e.g. "auto-correct drift under 2%, using MinTax, up to $5,000/quarter") — named here specifically as a contrast case, not a real candidate: it would cross this project's own CD-1.3/human-control and §8 human-in-the-loop boundary, the same line every other feature in this project was deliberately designed not to cross.</td>
+          <td>N/A — deliberately out of scope on principle, not on technical grounds.</td>
+          <td>N/A</td>
+          <td>Not applicable — included only to illustrate where this project's human-in-the-loop line is drawn, not as a proposed feature.</td>
+        </tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Next steps: source control and deployment</h2>
+    <p class="section-intro">Documentation only — nothing below has been executed. No remote has been created or pushed at any point in this project, and none will be without explicit confirmation at that specific step, regardless of what the credential audit below found.</p>
+
+    <div class="audit-result-box">
+      <div class="art">Credential audit: clean</div>
+      <p>Before any of this could responsibly be planned, the full git history (all commits, the only branch, no tags or dangling objects) was searched for a leaked credential — not just the current working tree.</p>
+      <ul>
+        <li><code>.env.local</code> was never staged or committed at any point, ever — only the placeholder <code>.env.example</code> has ever been tracked.</li>
+        <li>No real Gemini/Groq/Anthropic key value, or anything matching a plausible key pattern, appears anywhere in the full diff history — checked with patterns matched against this project's own real (never-printed) key formats, not just a guessed prefix.</li>
+        <li><code>.gitignore</code>'s coverage was verified functionally (<code>git check-ignore</code>), not just read — confirmed to actually exclude <code>.env.local</code>, <code>node_modules</code>, and build output at their real nested paths.</li>
+      </ul>
+      <p style="margin-top:8px;">See <code>DECISIONS.md</code> for this audit logged as its own decision.</p>
+    </div>
+
+    <div class="checklist-wrap">
+      <ol>
+        <li>
+          Decide repository visibility (public/private) and final naming.
+          <p class="step-note">Not yet decided — a real choice for the user to make, not inferred from context.</p>
+        </li>
+        <li>
+          Create the new GitHub repository.
+        </li>
+        <li>
+          Add it as a remote and push.
+          <span class="step-flag confirm">Explicit confirmation required</span>
+          <p class="step-note">Same standing constraint that has applied every session of this project — no remote is created or pushed to without the user explicitly approving that specific action, at that specific point.</p>
+        </li>
+        <li>
+          Connect the repository to Vercel.
+        </li>
+        <li>
+          Configure environment variables directly in Vercel's dashboard.
+          <span class="step-flag manual">Manual, human-only step</span>
+          <p class="step-note">Real API keys (Gemini/Groq/Anthropic) should never be typed by an agent into a third-party platform's credential fields — the same principle already applied to every credential-entry situation this project has encountered. Noted explicitly here so it isn't mistaken for something to automate later.</p>
+        </li>
+        <li>
+          Deploy, then verify the live URL actually works — specifically, confirm narration and the Scenario assistant function correctly against Vercel's configured environment, not just that the site loads.
+          <p class="step-note">Both features depend on a real, working API key reaching the deployed serverless functions (<code>api/narrate.ts</code>, <code>api/interpret.ts</code>) — a page that loads but silently falls back to deterministic text on every touchpoint would look like success without actually being it.</p>
+        </li>
+        <li>
+          Final housekeeping: confirm the root-level README accurately describes this project before it's public.
+          <p class="step-note"><strong>Done.</strong> A real root-level <code>README.md</code> now exists — project purpose, verified run instructions (<code>cd dev && npm install && npm run dev</code>, real port <strong>5173</strong>), the required environment variables, pointers to <code>CLAUDE.md</code>/<code>DECISIONS.md</code>/this page, and an honest scope note. Every command and path in it was actually run, not just written as plausible-sounding instructions — including <code>npm test</code>, <code>npm run test:e2e</code>, and <code>npm run build</code>. One correction to this checklist's own earlier note: it previously claimed <code>dev/README.md</code>'s stated port (5173) didn't match "this project's actual dev server" — that claim was itself never verified and turned out to be wrong. <code>vite.config.ts</code> hardcodes 5173 as the real default (only overridden by a <code>PORT</code> env var this project's own tooling sets for its own sandboxed preview access), independently corroborated by <code>playwright.config.ts</code>'s own <code>baseURL</code>. <code>dev/README.md</code>'s port was correct all along — its real errors (the original project's deployment link, the Anthropic-only backend claim, a stale directory tree) are unrelated to the port and remain unaddressed, since fixing that file wasn't this task's scope.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <footer class="pointer">
+    This page is a generated summary. Full detail, reasoning, and the complete decision-by-decision history live in <code>CLAUDE.md</code> and <code>DECISIONS.md</code> at the repository root — read those for anything this page simplifies away.
+  </footer>
+
+</div>
+</body>
+</html>
