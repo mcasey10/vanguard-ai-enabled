@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node"]
+  },
+  "files": [
+    "api/narrate.ts",
+    "api/interpret.ts",
+    "api/demo-config.ts",
+    "src/engine/index.ts",
+    "src/types/index.ts",
+    "src/utils/narrationShared.ts",
+    "src/utils/segmentResearch.ts",
+    "src/utils/whatIfShared.ts",
+    "src/server/narrationGenerator.ts",
+    "src/server/narrationPrompt.ts",
+    "src/server/whatIfInterpreter.ts",
+    "src/server/whatIfPrompt.ts",
+    "src/server/whatIfResponseParser.ts",
+    "src/server/generators/anthropicGenerator.ts",
+    "src/server/generators/geminiGenerator.ts",
+    "src/server/generators/groqGenerator.ts",
+    "src/server/generators/anthropicInterpreter.ts",
+    "src/server/generators/geminiInterpreter.ts",
+    "src/server/generators/groqInterpreter.ts"
+  ]
+}

@@ -15,10 +15,10 @@
  * Reads process.env.GROQ_API_KEY. Never imported from client code.
  */
 
-import type { WhatIfInterpreter } from '../whatIfInterpreter'
-import { WhatIfInterpreterApiError } from '../whatIfInterpreter'
-import { buildWhatIfPrompt } from '../whatIfPrompt'
-import { parseInterpreterResponse, WhatIfParseError } from '../whatIfResponseParser'
+import type { WhatIfInterpreter } from '../whatIfInterpreter.js'
+import { WhatIfInterpreterApiError } from '../whatIfInterpreter.js'
+import { buildWhatIfPrompt } from '../whatIfPrompt.js'
+import { parseInterpreterResponse, WhatIfParseError } from '../whatIfResponseParser.js'
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'openai/gpt-oss-120b'

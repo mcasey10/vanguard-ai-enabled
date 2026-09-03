@@ -18,9 +18,9 @@
  * Reads process.env.GEMINI_API_KEY. Never imported from client code.
  */
 
-import type { NarrationGenerator } from '../narrationGenerator'
-import { NarrationApiError } from '../narrationGenerator'
-import { buildNarrationPrompt } from '../narrationPrompt'
+import type { NarrationGenerator } from '../narrationGenerator.js'
+import { NarrationApiError } from '../narrationGenerator.js'
+import { buildNarrationPrompt } from '../narrationPrompt.js'
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions'
 const MODEL = 'gemini-3.5-flash-lite'

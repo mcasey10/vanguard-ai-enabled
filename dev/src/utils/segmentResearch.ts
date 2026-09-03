@@ -14,7 +14,7 @@
  * silently rewritten (a quote gets reproduced exactly or not at all).
  */
 
-import type { NarrationSegment } from './narrationShared'
+import type { NarrationSegment } from './narrationShared.js'
 
 export interface SegmentProfile {
   name: string

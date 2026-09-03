@@ -15,8 +15,8 @@
  * after review of real generated output — see DECISIONS.md D045.
  */
 
-import type { NarrationInput, NarrationTense } from '../utils/narrationShared'
-import { SEGMENT_PROFILES } from '../utils/segmentResearch'
+import type { NarrationInput, NarrationTense } from '../utils/narrationShared.js'
+import { SEGMENT_PROFILES } from '../utils/segmentResearch.js'
 
 // Whether the transaction being narrated has actually happened yet — orthogonal
 // to touchpoint and segment, and previously silently discarded by this module

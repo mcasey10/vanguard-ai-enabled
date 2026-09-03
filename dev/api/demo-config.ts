@@ -17,8 +17,8 @@
  * calculation — both functions just pick an adapter object synchronously.
  */
 
-import { getActiveGenerator } from '../src/server/narrationGenerator'
-import { getActiveInterpreter } from '../src/server/whatIfInterpreter'
+import { getActiveGenerator } from '../src/server/narrationGenerator.js'
+import { getActiveInterpreter } from '../src/server/whatIfInterpreter.js'
 
 interface VercelLikeRequest {
   method?: string

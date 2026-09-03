@@ -13,8 +13,8 @@
  * not a guarantee a model actually follows it.
  */
 
-import type { WhatIfInterpretationInput } from '../utils/whatIfShared'
-import type { NarrationSegment } from '../utils/narrationShared'
+import type { WhatIfInterpretationInput } from '../utils/whatIfShared.js'
+import type { NarrationSegment } from '../utils/narrationShared.js'
 
 /**
  * Reader-tone guidance for clarifying questions and confirm summaries (D071)

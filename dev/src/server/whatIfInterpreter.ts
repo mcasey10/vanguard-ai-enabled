@@ -10,10 +10,10 @@
  * Vite dev-server middleware are the only callers.
  */
 
-import type { WhatIfInterpretationInput, WhatIfInterpretationResult } from '../utils/whatIfShared'
-import { geminiInterpreter } from './generators/geminiInterpreter'
-import { anthropicInterpreter } from './generators/anthropicInterpreter'
-import { groqInterpreter } from './generators/groqInterpreter'
+import type { WhatIfInterpretationInput, WhatIfInterpretationResult } from '../utils/whatIfShared.js'
+import { geminiInterpreter } from './generators/geminiInterpreter.js'
+import { anthropicInterpreter } from './generators/anthropicInterpreter.js'
+import { groqInterpreter } from './generators/groqInterpreter.js'
 
 // Same reasoning as NarrationApiError's identical field (narrationGenerator.ts) —
 // the real HTTP status, when a real response came back, captured for the

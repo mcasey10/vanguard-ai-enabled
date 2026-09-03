@@ -8,7 +8,7 @@
  * narrationPrompt.ts is shared rather than copied into each generator.
  */
 
-import type { WhatIfInterpretationResult, WhatIfCandidate } from '../utils/whatIfShared'
+import type { WhatIfInterpretationResult, WhatIfCandidate } from '../utils/whatIfShared.js'
 
 export class WhatIfParseError extends Error {}
 

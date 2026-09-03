@@ -8,10 +8,10 @@
  * Reads process.env.GEMINI_API_KEY. Never imported from client code.
  */
 
-import type { WhatIfInterpreter } from '../whatIfInterpreter'
-import { WhatIfInterpreterApiError } from '../whatIfInterpreter'
-import { buildWhatIfPrompt } from '../whatIfPrompt'
-import { parseInterpreterResponse, WhatIfParseError } from '../whatIfResponseParser'
+import type { WhatIfInterpreter } from '../whatIfInterpreter.js'
+import { WhatIfInterpreterApiError } from '../whatIfInterpreter.js'
+import { buildWhatIfPrompt } from '../whatIfPrompt.js'
+import { parseInterpreterResponse, WhatIfParseError } from '../whatIfResponseParser.js'
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions'
 const MODEL = 'gemini-3.5-flash-lite'

@@ -8,10 +8,10 @@
  * Vite dev-server middleware are the only callers.
  */
 
-import type { NarrationInput } from '../utils/narrationShared'
-import { anthropicGenerator } from './generators/anthropicGenerator'
-import { geminiGenerator } from './generators/geminiGenerator'
-import { groqGenerator } from './generators/groqGenerator'
+import type { NarrationInput } from '../utils/narrationShared.js'
+import { anthropicGenerator } from './generators/anthropicGenerator.js'
+import { geminiGenerator } from './generators/geminiGenerator.js'
+import { groqGenerator } from './generators/groqGenerator.js'
 
 // `status`, when present, is the real HTTP status the provider's own API
 // response carried — captured here so callers (the API route handler) can

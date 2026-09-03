@@ -7,9 +7,9 @@
  * Reads process.env.ANTHROPIC_API_KEY. Never imported from client code.
  */
 
-import type { NarrationGenerator } from '../narrationGenerator'
-import { NarrationApiError } from '../narrationGenerator'
-import { buildNarrationPrompt } from '../narrationPrompt'
+import type { NarrationGenerator } from '../narrationGenerator.js'
+import { NarrationApiError } from '../narrationGenerator.js'
+import { buildNarrationPrompt } from '../narrationPrompt.js'
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 const MODEL = 'claude-sonnet-5'

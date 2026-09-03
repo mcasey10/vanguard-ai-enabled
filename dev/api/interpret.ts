@@ -11,8 +11,8 @@
  * before it's trusted (see dev/src/utils/whatIf.ts). See CLAUDE.md §8.
  */
 
-import { getActiveInterpreter, WhatIfInterpreterApiError } from '../src/server/whatIfInterpreter'
-import type { WhatIfInterpretationInput } from '../src/utils/whatIfShared'
+import { getActiveInterpreter, WhatIfInterpreterApiError } from '../src/server/whatIfInterpreter.js'
+import type { WhatIfInterpretationInput } from '../src/utils/whatIfShared.js'
 
 interface VercelLikeRequest {
   method?: string

@@ -36,7 +36,7 @@ import type {
   AllocationImpact,
   TaxAssumptionSet,
   TaxFigureOrNA,
-} from '../types'
+} from '../types/index.js'
 
 // ---------------------------------------------------------------------------
 // Public types

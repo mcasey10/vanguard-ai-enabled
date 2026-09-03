@@ -23,9 +23,9 @@
  * Reads process.env.GROQ_API_KEY. Never imported from client code.
  */
 
-import type { NarrationGenerator } from '../narrationGenerator'
-import { NarrationApiError } from '../narrationGenerator'
-import { buildNarrationPrompt } from '../narrationPrompt'
+import type { NarrationGenerator } from '../narrationGenerator.js'
+import { NarrationApiError } from '../narrationGenerator.js'
+import { buildNarrationPrompt } from '../narrationPrompt.js'
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'openai/gpt-oss-120b'

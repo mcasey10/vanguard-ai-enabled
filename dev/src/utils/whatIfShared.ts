@@ -7,13 +7,13 @@
  * structured candidate OR a question out).
  */
 
-import type { Portfolio, AccountType, SavedScenario } from '../types'
-import type { ManualFundSelection } from '../engine/index'
+import type { Portfolio, AccountType, SavedScenario } from '../types/index.js'
+import type { ManualFundSelection } from '../engine/index.js'
 // Reused, not redefined (D071) — the same A/B/C/D reader-tone concept
 // narration already carries (CLAUDE.md §6/CD-2.x); keeping one type avoids
 // the two features' segment concepts drifting apart the way their letters
 // once could have without a shared source of truth.
-import type { NarrationSegment } from './narrationShared'
+import type { NarrationSegment } from './narrationShared.js'
 
 // Re-exported, not redefined — a what-if candidate's fund selection is
 // exactly a ManualFundSelection; keeping one shape avoids two definitions

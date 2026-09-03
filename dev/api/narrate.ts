@@ -8,8 +8,8 @@
  * calculation of its own. See CLAUDE.md §7.
  */
 
-import { getActiveGenerator, NarrationApiError } from '../src/server/narrationGenerator'
-import type { NarrationInput } from '../src/utils/narrationShared'
+import { getActiveGenerator, NarrationApiError } from '../src/server/narrationGenerator.js'
+import type { NarrationInput } from '../src/utils/narrationShared.js'
 
 interface VercelLikeRequest {
   method?: string

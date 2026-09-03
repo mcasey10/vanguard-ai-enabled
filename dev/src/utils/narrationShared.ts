@@ -5,7 +5,7 @@
  * an API key — see CLAUDE.md §7 for the CD-4.2 boundary this enforces.
  */
 
-import type { AccountingMethod, AccountType } from '../types'
+import type { AccountingMethod, AccountType } from '../types/index.js'
 
 export type NarrationTouchpoint =
   | 'fund_selection_rationale'
