@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { Settings } from 'lucide-react'
 import { CoachMark } from '../CoachMark'
+import { DemoSettingsDialog } from '../DemoSettingsDialog'
 
 const NAV_ITEMS = [
   { label: 'Dashboard',        to: '#' },
@@ -12,6 +15,8 @@ const NAV_ITEMS = [
 ]
 
 export default function L2Nav() {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
   return (
     <nav className="bg-white flex items-stretch h-12 px-6 gap-6 border-b border-vg-border shrink-0">
       {NAV_ITEMS.map(({ label, to }) =>
@@ -41,16 +46,25 @@ export default function L2Nav() {
         ),
       )}
 
-      {/* Reset demo — utility link + beacon, far right */}
+      {/* Demo settings — replaces the standalone "Reset demo" link entirely
+          (D071). Reset demo lives inside the dialog now, as its own
+          confirmation-gated section, alongside reader segment and AI
+          provider selection. */}
       <div className="ml-auto flex items-center gap-2">
-        <CoachMark id="reset-demo" text="Reset demo is not part of the production feature set — it exists for demonstration purposes only. It restores the canonical sample portfolio ($870,619.40 total value), clears all completed transactions, and restores all coach mark beacons to their initial state." />
-        <a
-          onClick={() => { window.location.href = '/?reset=true' }}
-          className="flex items-center text-[11px] text-[#717777] underline cursor-pointer whitespace-nowrap hover:opacity-80"
+        <CoachMark
+          id="demo-settings"
+          text="Demo settings is not part of the production feature set — it exists for demonstration purposes only. Choose the reader segment AI narration is tuned for, switch which AI provider each feature uses, or reset the demo entirely (restores the canonical sample portfolio, clears all completed transactions, and restores all coach mark beacons)."
+        />
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="flex items-center gap-[6px] text-[11px] text-[#717777] cursor-pointer whitespace-nowrap hover:opacity-80"
         >
-          Reset demo
-        </a>
+          <Settings size={14} className="text-[#717777]" />
+          Demo settings
+        </button>
       </div>
+
+      {settingsOpen && <DemoSettingsDialog onClose={() => setSettingsOpen(false)} />}
     </nav>
   )
 }

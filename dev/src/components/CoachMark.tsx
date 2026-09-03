@@ -9,6 +9,16 @@
  *
  * The component renders null once dismissed. Position it inline adjacent to
  * the UI element it explains — the dialog auto-positions via getBoundingClientRect.
+ *
+ * Also exports clearAllCoachMarks() — the Demo Settings "Clear all coach
+ * marks" action (DECISIONS.md's clear-all-coach-marks entry). Coach marks are
+ * scattered across many pages and only the ones on the *current* route are
+ * ever mounted at once (this app has no persistent page that holds all of
+ * them) — so a "clear all" that snapshots currently-mounted IDs could never
+ * reach the ones on pages the user isn't viewing right now, and a hardcoded
+ * ID list would silently go stale the next time a CoachMark is added
+ * somewhere. Both are avoided by storing a single sentinel value instead of
+ * a per-ID array when "clear all" is used — see DISMISS_ALL_SENTINEL below.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -20,20 +30,62 @@ import { createPortal } from 'react-dom'
 
 const LS_KEY = 'vsr_coach_marks_dismissed'
 
-function getDismissed(): string[] {
+// Sentinel stored in place of a per-ID array — deliberately ID-agnostic, so
+// it dismisses every coach mark that exists today AND any added in a future
+// code change, with no ID list anywhere to remember to update. A raw string
+// (not JSON-wrapped) so it's cheap to check before ever attempting
+// JSON.parse on the normal array case.
+const DISMISS_ALL_SENTINEL = 'ALL'
+
+function isDismissed(id: string): boolean {
   try {
     const raw = localStorage.getItem(LS_KEY)
-    return raw ? (JSON.parse(raw) as string[]) : []
+    if (!raw) return false
+    if (raw === DISMISS_ALL_SENTINEL) return true
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) && parsed.includes(id)
   } catch {
-    return []
+    return false
   }
 }
 
 function addDismissed(id: string): void {
-  const current = getDismissed()
+  let current: string[] = []
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (raw && raw !== DISMISS_ALL_SENTINEL) {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) current = parsed
+    }
+  } catch {
+    current = []
+  }
   if (!current.includes(id)) {
     localStorage.setItem(LS_KEY, JSON.stringify([...current, id]))
   }
+}
+
+/**
+ * "Clear all coach marks" (Demo Settings) — a simple, one-time dismiss-all
+ * action, not a persistent preference: it dismisses every coach mark that
+ * exists right now, exactly as if the user had clicked "Got it" on each one.
+ * It does NOT prevent a coach mark added in a future code change from ever
+ * showing — only ones that exist at the moment this is clicked. Lower-stakes
+ * than "Reset demo" (FundSelectionEntry.tsx's /?reset=true flow) — that flow
+ * removes this same localStorage key entirely (unconditionally restoring
+ * every coach mark) and is deliberately left untouched by this addition;
+ * this function only ever *sets* the key, never removes it, so the two
+ * actions can't interfere with each other's behavior.
+ *
+ * Fires the same 'vsr-reset' event Reset demo already dispatches — every
+ * mounted CoachMark already listens to it to re-check its own dismissed
+ * state, and "something external changed dismissed-state, recheck" is
+ * exactly the right semantics for both cases, so the existing plumbing is
+ * reused rather than duplicated with a second event name.
+ */
+export function clearAllCoachMarks(): void {
+  localStorage.setItem(LS_KEY, DISMISS_ALL_SENTINEL)
+  window.dispatchEvent(new Event('vsr-reset'))
 }
 
 // ---------------------------------------------------------------------------
@@ -82,14 +134,15 @@ interface CoachMarkProps {
 }
 
 export function CoachMark({ id, title, text, className, style }: CoachMarkProps) {
-  const [dismissed, setDismissed] = useState(() => getDismissed().includes(id))
+  const [dismissed, setDismissed] = useState(() => isDismissed(id))
   const [open, setOpen]           = useState(false)
   const [dialogPos, setDialogPos] = useState<DialogPosition>({ top: 0, left: 0 })
   const beaconRef = useRef<HTMLButtonElement>(null)
 
-  // Re-check if dismissed on mount and on vsr-reset (covers reset flow)
+  // Re-check if dismissed on mount and on vsr-reset (covers both the full
+  // Reset-demo flow and the Demo Settings "Clear all coach marks" action)
   useEffect(() => {
-    const check = () => setDismissed(getDismissed().includes(id))
+    const check = () => setDismissed(isDismissed(id))
     check()
     window.addEventListener('vsr-reset', check)
     return () => window.removeEventListener('vsr-reset', check)
