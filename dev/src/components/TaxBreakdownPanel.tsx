@@ -62,6 +62,7 @@ export function TaxBreakdownPanel({ accountType, funds, taxRates, saleTotal }: T
     <div className="flex flex-col">
       <Row label="Net short-term gain/loss" value={display.netSTLine} />
       <Row label="Net long-term gain/loss" value={display.netLTLine} />
+      <Row label="Net Taxable Gain" value={display.netTaxableGainLine} bold />
       <div className="h-px bg-[#e8e9e9] my-[6px]" />
       <Row label="Short-term tax" value={display.stTaxLine} />
       <Row label="Long-term tax" value={display.ltTaxLine} />

@@ -93,6 +93,11 @@ describe('buildTaxBreakdownDisplay — end-to-end against real computeNetTaxBrea
     if (display.kind !== 'taxable_brokerage') throw new Error('expected taxable_brokerage')
     expect(display.netSTLine).toBe('$645.81 − $483.69 = +$162.12') // two contributors, mixed sign
     expect(display.netLTLine).toBe('−$1,057.00') // single contributor, no equation
+    // The bridging row this task added: net ST and net LT genuinely offset
+    // (one positive, one negative), so this must show the connecting
+    // equation, not just a bare number unconnected to the two rows above it.
+    expect(display.netTaxableGainLine).toBe(`${formatNettingEquation([breakdown.netSTGain, breakdown.netLTGain])}`)
+    expect(display.netTaxableGainLine).toBe('$162.12 − $1,057.00 = −$894.88')
     expect(display.totalLine).toBe(`$${breakdown.total.toFixed(2)}`)
     // The two tax lines' own numeric results sum to the real total — the
     // core guarantee this whole feature exists to provide.
@@ -128,6 +133,11 @@ describe('buildTaxBreakdownDisplay — end-to-end against real computeNetTaxBrea
     const display = buildTaxBreakdownDisplay('taxable_brokerage', funds, breakdown, RATES, 10000, 'unused')
     if (display.kind !== 'taxable_brokerage') throw new Error('expected taxable_brokerage')
     expect(display.netSTLine).toBe('−$500.00') // the raw net (informational)
+    // The bridging row: −$500 ST and +$1,000 LT genuinely offset, netting to
+    // +$500 — the same number the LT tax line's $500.00 taxable attribution
+    // traces back to, even though the ST tax line below shows $0 (the ST
+    // loss was absorbed entirely by the LT gain, not taxed on its own).
+    expect(display.netTaxableGainLine).toBe('−$500.00 + $1,000.00 = +$500.00')
     expect(display.stTaxLine).toBe('$0.00 × 24% = $0.00') // the real taxable attribution (what's actually taxed)
     expect(display.ltTaxLine).toBe('$500.00 × 15% = $75.00')
     expect(display.totalLine).toBe('$75.00')

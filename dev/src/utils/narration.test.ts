@@ -254,8 +254,15 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
       // est_net_tax/effective_rate: real portfolio-level netted figures from the
       // engine, not a naive sum of each fund's own est_tax_gross (which would
       // double-count/miss the cross-fund netting the engine already did).
+      // effective_rate specifically: rec.effective_rate is stored as a raw
+      // fraction (e.g. 0.0044 for 0.44%) — the builder converts it to a real
+      // percentage before it reaches NarrationInput (see DECISIONS.md's
+      // effective-rate/target-match entry). Asserting input.effective_rate
+      // equals the raw fraction unconverted (the pre-fix behavior) is exactly
+      // the "0.00% effective rate" bug this test would previously have
+      // encoded as correct rather than caught.
       expect(input.est_net_tax).toBe(rec.est_net_tax)
-      expect(input.effective_rate).toBe(rec.effective_rate)
+      expect(input.effective_rate).toBeCloseTo(rec.effective_rate * 100, 6)
       const sumOfPerFundTax = rec.fund_results.reduce((s, fr) => s + taxFigureToNumber(fr.est_tax_gross), 0)
       expect(input.est_net_tax).not.toBe(sumOfPerFundTax) // sanity: netting actually changes the figure for this fixture
 
@@ -668,6 +675,65 @@ describe('tax-figure regression guard (DECISIONS.md D044)', () => {
     // Would have failed against the old hand-typed fixture helper, which
     // defaulted est_tax_gross to 0 regardless of the real gain — this test
     // exists specifically so that regression can't happen silently again.
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Effective-rate units and target-allocation regression guard (this task's
+// own fix). Both bugs were the same root shape: a real number reached the
+// model, but either in the wrong units (effective_rate: a raw 0-1 fraction,
+// e.g. 0.0044, presented to the model with no way to know it wasn't already
+// a percentage) or entirely fabricated (allocation_impact.target used to be
+// a copy of `after`, so narration always described the sale as landing
+// exactly on target). Neither was the model inventing something from a
+// genuinely empty field — see DECISIONS.md's effective-rate/target-match
+// entry for the full diagnosis.
+// ---------------------------------------------------------------------------
+
+describe('effective-rate units and target-allocation accuracy regression guard', () => {
+  test('effective_rate reaching NarrationInput is a real percentage, not the engine\'s raw fraction — reproduces the "0.00% effective rate" bug directly', () => {
+    const rec = automatedRun(TAXABLE, 25000, 'tax-first')
+    // Sanity: the engine's own stored field really is a small fraction
+    // (e.g. 0.0044 for 0.44%), not already a percentage — if this ever stops
+    // holding, the conversion below would need to change too.
+    expect(rec.effective_rate).toBeGreaterThan(0)
+    expect(rec.effective_rate).toBeLessThan(1)
+    const input = buildFundResultNarrationInput({
+      fundResults: rec.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'A',
+      est_net_tax: rec.est_net_tax, effective_rate: rec.effective_rate,
+    })
+    expect(input.effective_rate).toBeCloseTo(rec.effective_rate * 100, 6)
+    // The actual bug, reproduced: formatting the OLD unconverted fraction to
+    // 2 decimals collapses to "0.00%" even though a real, nonzero tax was
+    // charged — formatting the FIXED value must not.
+    expect(rec.effective_rate.toFixed(2)).toBe('0.00') // the raw fraction really does collapse to this
+    expect(input.effective_rate!.toFixed(2)).not.toBe('0.00') // the fixed value must not
+  })
+
+  test('allocation_impact.target is the real portfolio target_allocation, not a copy of "after" — reproduces the "perfectly reaching your target allocations" bug directly', () => {
+    // A partial sale of only the overweight equity fund: moves toward target
+    // but, by construction, does not land exactly on it — a genuine nonzero
+    // gap must remain in the narration input's target snapshot.
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const scenario = buildScenarioFromFundResults(config.fund_results, portfolio, TAX_RATES, config.allocation_impact, TAXABLE)
+    expect(scenario).not.toBeNull()
+    const input = buildScenarioNarrationInput({ scenario: scenario!, portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+
+    // The real dataset target (sample-dataset.json) — asserted against the
+    // portfolio fixture directly, never hand-typed, so this test can't drift
+    // out of sync with the real data it's supposed to be checking against.
+    const ta = portfolio.target_allocation!
+    expect(input.allocation_impact!.target.domestic_equity).toBe(ta.domestic_equity_pct)
+    expect(input.allocation_impact!.target.international_equity).toBe(ta.international_equity_pct)
+    expect(input.allocation_impact!.target.domestic_bonds).toBe(ta.domestic_bonds_pct)
+    expect(input.allocation_impact!.target.short_term_reserves).toBe(ta.short_term_reserves_pct)
+
+    // The bug this reproduces: target used to be a literal copy of `after`,
+    // which would make this comparison trivially pass no matter the real
+    // gap. Assert `after` is genuinely NOT equal to `target` for this
+    // fixture (a small partial sale, not a full rebalance to target) —
+    // otherwise this test couldn't actually distinguish the fix from the bug.
+    expect(input.allocation_impact!.after.domestic_equity).not.toBe(input.allocation_impact!.target.domestic_equity)
   })
 })
 

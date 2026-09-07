@@ -8,7 +8,7 @@
 import type {
   Portfolio, Recommendation, SavedScenario, ManualConfiguration,
   TransactionRecord, FundSaleResult, AccountingMethod, AllocationImpact,
-  TaxFigureOrNA,
+  TaxFigureOrNA, TargetAllocation,
 } from '../types'
 import { getMarketContextData } from '../data/loader'
 import { taxFigureToNumber } from './format'
@@ -39,7 +39,23 @@ function findLotAcquisitionDate(portfolio: Portfolio, fundId: string, lotId: str
   return ''
 }
 
-function toAllocationImpact(ai: AllocationImpact): NarrationAllocationImpact {
+// AllocationImpact (before/after) has no target snapshot of its own — the
+// real target lives on Portfolio.target_allocation. This function used to
+// fabricate `target` by copying `after` into it, with a comment claiming "no
+// callers need one" — which meant every touchpoint that narrates allocation
+// impact was silently telling the model the sale had landed EXACTLY on
+// target, every time, regardless of the real numbers, since target === after
+// by construction. That produced narration like "perfectly reaching your
+// target allocations" even when the same screen's own "Gap to target" row
+// showed real, nonzero gaps — not the model inventing a number from nothing,
+// but the model accurately describing a fabricated field it had no way to
+// know was fake (see DECISIONS.md's effective-rate/target-match entry).
+// `targetAllocation` may legitimately be null (Portfolio.target_allocation's
+// own type) — the 55/35/10 fallback mirrors scenarioBuilder.ts's own
+// established default for exactly this case, folded entirely into
+// domestic_equity (international_equity: 0) since there is no precedent
+// anywhere in this codebase for a fallback domestic/international split.
+function toAllocationImpact(ai: AllocationImpact, targetAllocation: TargetAllocation | null): NarrationAllocationImpact {
   return {
     before: {
       domestic_equity: ai.domestic_equity_before,
@@ -53,14 +69,19 @@ function toAllocationImpact(ai: AllocationImpact): NarrationAllocationImpact {
       domestic_bonds: ai.domestic_bonds_after,
       short_term_reserves: ai.short_term_reserves_after,
     },
-    // AllocationImpact has no target snapshot of its own — callers that need
-    // one (none currently do) would source it from portfolio.target_allocation.
-    target: {
-      domestic_equity: ai.domestic_equity_after,
-      international_equity: ai.international_equity_after,
-      domestic_bonds: ai.domestic_bonds_after,
-      short_term_reserves: ai.short_term_reserves_after,
-    },
+    target: targetAllocation
+      ? {
+          domestic_equity: targetAllocation.domestic_equity_pct,
+          international_equity: targetAllocation.international_equity_pct,
+          domestic_bonds: targetAllocation.domestic_bonds_pct,
+          short_term_reserves: targetAllocation.short_term_reserves_pct,
+        }
+      : {
+          domestic_equity: 55,
+          international_equity: 0,
+          domestic_bonds: 35,
+          short_term_reserves: 10,
+        },
   }
 }
 
@@ -133,7 +154,15 @@ export function buildFundResultNarrationInput(params: {
     segment: params.segment,
     funds,
     est_net_tax: params.est_net_tax,
-    effective_rate: params.effective_rate,
+    // Recommendation.effective_rate / the manual-mode equivalent are both
+    // stored as a raw fraction (e.g. 0.0044 for 0.44%) — this is the one
+    // place that fraction becomes a real percentage number before reaching
+    // the model. Passing the fraction through as-is (the pre-fix behavior)
+    // is what produced the "0.00% effective rate" bug: the model sees a
+    // field literally named effective_rate holding 0.0044, has no way to
+    // know it isn't already a percentage, and rounds it to "0.00%" — see
+    // DECISIONS.md's effective-rate/target-match entry.
+    effective_rate: params.effective_rate !== undefined ? r2(params.effective_rate * 100) : undefined,
     est_early_withdrawal_penalty: meaningfulPenalty(params.est_early_withdrawal_penalty),
     losses_harvested: lossesHarvested,
     wait_and_save_notices: params.wait_and_save_notices,
@@ -187,9 +216,11 @@ export function buildScenarioNarrationInput(params: {
     segment: params.segment,
     funds,
     est_net_tax: params.scenario.est_net_tax,
-    effective_rate: params.scenario.effective_rate,
+    // SavedScenario.effective_rate is a raw fraction (e.g. 0.0044) — see
+    // buildFundResultNarrationInput's identical conversion above for why.
+    effective_rate: r2(params.scenario.effective_rate * 100),
     losses_harvested: params.scenario.losses_harvested,
-    allocation_impact: toAllocationImpact(params.scenario.allocation_impact),
+    allocation_impact: toAllocationImpact(params.scenario.allocation_impact, params.portfolio.target_allocation),
   }
 }
 
@@ -288,12 +319,26 @@ export function buildExecutionSummaryNarrationInput(params: {
         domestic_bonds: params.transaction.bonds_after_pct,
         short_term_reserves: params.transaction.reserves_after_pct,
       },
-      target: {
-        domestic_equity: params.transaction.stocks_after_pct,
-        international_equity: 0,
-        domestic_bonds: params.transaction.bonds_after_pct,
-        short_term_reserves: params.transaction.reserves_after_pct,
-      },
+      // Real target_allocation, not a copy of `after` (see toAllocationImpact's
+      // doc comment above for why that was a real bug, not a convenience
+      // simplification) — folded into domestic_equity/international_equity:0
+      // the same way stocks_after_pct above already folds domestic+
+      // international into one number, since TransactionRecord never kept
+      // the two asset classes separate to begin with. Fallback mirrors
+      // scenarioBuilder.ts's own 55/35/10 default for a null target_allocation.
+      target: params.portfolio.target_allocation
+        ? {
+            domestic_equity: r2(params.portfolio.target_allocation.domestic_equity_pct + params.portfolio.target_allocation.international_equity_pct),
+            international_equity: 0,
+            domestic_bonds: params.portfolio.target_allocation.domestic_bonds_pct,
+            short_term_reserves: params.portfolio.target_allocation.short_term_reserves_pct,
+          }
+        : {
+            domestic_equity: 55,
+            international_equity: 0,
+            domestic_bonds: 35,
+            short_term_reserves: 10,
+          },
     },
   }
 }

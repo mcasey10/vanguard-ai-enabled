@@ -96,6 +96,7 @@ export interface TaxableBrokerageBreakdownDisplay {
   kind: 'taxable_brokerage'
   netSTLine: string
   netLTLine: string
+  netTaxableGainLine: string
   stTaxLine: string
   ltTaxLine: string
   totalLine: string
@@ -148,6 +149,16 @@ export function buildTaxBreakdownDisplay(
     kind: 'taxable_brokerage',
     netSTLine: formatNetGainLine(funds.map(f => f.est_st_gain_loss)),
     netLTLine: formatNetGainLine(funds.map(f => f.est_lt_gain_loss)),
+    // The bridging step the panel was missing: net ST and net LT are each
+    // shown above, then the tax lines below jump straight to a third number
+    // (taxableAtST/taxableAtLT) with nothing connecting the two — this row
+    // is that connection, reusing the same "show the netting equation when
+    // there's a real offsetting story, otherwise just the net number"
+    // convention formatNetGainLine already applies within a single category,
+    // now applied across the two categories. Same figure and same label as
+    // Scenario Analysis's existing "Net Taxable Gain" row (ScenarioAnalysis.tsx
+    // TaxRow, SavedScenario.net_taxable_gain) — reused, not reinvented.
+    netTaxableGainLine: formatNetGainLine([breakdown.netSTGain, breakdown.netLTGain]),
     stTaxLine: formatTaxLine(breakdown.taxableAtST, taxRates.st_rate, breakdown.stTax),
     ltTaxLine: formatTaxLine(breakdown.taxableAtLT, taxRates.lt_rate, breakdown.ltTax),
     totalLine: formatCurrency(breakdown.total),
