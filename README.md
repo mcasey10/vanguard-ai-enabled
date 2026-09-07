@@ -7,6 +7,15 @@ An AI-**enabled** extension of an existing portfolio Sell & Rebalance applicatio
 
 The project's actual subject is the *design* of that layer, not just building it: what AI-enabled design requires that AI-assisted development doesn't, where a human-in-the-loop boundary needs to sit, and what breaks (in this app's own pre-existing code, and in the AI layer itself) when you try to add it responsibly. See [`CLAUDE.md`](CLAUDE.md) for the full framing.
 
+## Live deployment
+
+| | |
+|---|---|
+| **Live app** | [vanguard-ai-enabled.vercel.app](https://vanguard-ai-enabled.vercel.app) |
+| **Reset to a fresh demo state** | [vanguard-ai-enabled.vercel.app/?reset=true](https://vanguard-ai-enabled.vercel.app/?reset=true) |
+
+The live app has no server-side persistence of its own — every visitor's session lives in that browser's local storage. The reset link clears it and reseeds the canonical sample portfolio and demo scenarios, exactly what the app's own in-app "Reset demo" control (Demo Settings → Reset demo) does.
+
 ## Running it locally
 
 ```bash
