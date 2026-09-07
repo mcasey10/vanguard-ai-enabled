@@ -23,6 +23,7 @@ import type { NarrationSegment } from '../utils/narrationShared'
 import { OFFERED_PROVIDERS, fetchServerProviderDefaults, type DemoProvider, type ServerProviderDefaults } from '../utils/demoSettings'
 import { getProviderFailureDisplay } from '../utils/providerFailureTracker'
 import { clearAllCoachMarks } from './CoachMark'
+import { ExpandableDetail } from './ExpandableDetail'
 
 const SEGMENTS: NarrationSegment[] = ['A', 'B', 'C', 'D']
 
@@ -153,6 +154,19 @@ export function DemoSettingsDialog({ onClose }: { onClose: () => void }) {
           {/* Section A — reader segment */}
           <section className="flex flex-col gap-3">
             <span className="text-[12px] font-bold text-vg-ink">User segment for tone of AI narration</span>
+            {/* Orients the reader before they use the control below, unlike
+                every other ExpandableDetail in this app (Breakdown, Why?, Lot
+                details), which explains a result that already exists — those
+                belong after the thing they explain, this belongs before it.
+                General/constant across all four segments either way —
+                deliberately not inside the per-segment profile card further
+                below, which would make this read as specific to whichever
+                segment happens to be selected. */}
+            <ExpandableDetail label="How is this used?" panelWidth={420}>
+              <p className="text-[12px] text-vg-ink leading-relaxed">
+                This selector is used to demonstrate how the AI narration can adapt to a user&apos;s mindset. These four user segments come from research describing situational mindsets (not personas). The same investor can occupy different situational mindsets at different times, but this demo app doesn&apos;t attempt to infer a segment from behavior. A production version could derive some context about the user&apos;s mindset based upon the complexity of their portfolio and scenario inputs, and/or offer the user an option to include more/less detail.
+              </p>
+            </ExpandableDetail>
             <SegmentControl
               value={demoSettings.narrationSegment}
               onChange={s => setDemoSettings({ narrationSegment: s })}
@@ -209,7 +223,7 @@ export function DemoSettingsDialog({ onClose }: { onClose: () => void }) {
           <section className="flex flex-col gap-3">
             <span className="text-[12px] font-bold text-vg-ink">Coach marks</span>
             <p className="text-[12px] text-[#717777] leading-normal">
-              Dismisses every walkthrough tip beacon across the app, as if "Got it" had been clicked on each one. A one-time action, not a saved preference — if beacons reappear after a later Reset demo, this won't re-hide them; click it again.
+              Dismisses every Coach mark beacon, as if "Got it" had been clicked on each one.
             </p>
             <div className="flex items-center gap-3">
               <button
