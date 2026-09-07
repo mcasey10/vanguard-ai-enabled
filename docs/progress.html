@@ -239,19 +239,6 @@
   .checklist-wrap ol li { margin-bottom: 16px; color: var(--text); }
   .checklist-wrap ol li:last-child { margin-bottom: 0; }
   .checklist-wrap p.step-note { margin: 4px 0 0; color: var(--text-dim); font-size: 13.5px; }
-  .step-flag {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 2px 8px;
-    border-radius: 100px;
-    margin-left: 8px;
-    vertical-align: middle;
-  }
-  .step-flag.manual { background: var(--red-soft); color: var(--red); }
-  .step-flag.confirm { background: var(--amber-soft); color: var(--amber); }
   .audit-result-box {
     background: var(--green-soft);
     border: 1px solid var(--green);
@@ -629,49 +616,60 @@
   </section>
 
   <section>
-    <h2>Next steps: source control and deployment</h2>
-    <p class="section-intro">Documentation only — nothing below has been executed. No remote has been created or pushed at any point in this project, and none will be without explicit confirmation at that specific step, regardless of what the credential audit below found.</p>
+    <h2>Deployment record: source control and hosting</h2>
+    <p class="section-intro">This was a forward-looking checklist for most of this project's life; it no longer is. Every item below has actually happened — the repository is public and pushed, the app is live on Vercel with real provider keys, and this page itself is served from GitHub Pages. Each status below was confirmed directly against real git/deployment state at the time this section was last written, not carried over from the plan that preceded it.</p>
 
     <div class="audit-result-box">
       <div class="art">Credential audit: clean</div>
-      <p>Before any of this could responsibly be planned, the full git history (all commits, the only branch, no tags or dangling objects) was searched for a leaked credential — not just the current working tree.</p>
+      <p>Before this history was ever pushed publicly, the full git history (all commits, the only branch, no tags or dangling objects) was searched for a leaked credential — not just the current working tree. Re-run again at multiple later checkpoints as more work accumulated, most recently before the pushes that landed D119–D121.</p>
       <ul>
         <li><code>.env.local</code> was never staged or committed at any point, ever — only the placeholder <code>.env.example</code> has ever been tracked.</li>
         <li>No real Gemini/Groq/Anthropic key value, or anything matching a plausible key pattern, appears anywhere in the full diff history — checked with patterns matched against this project's own real (never-printed) key formats, not just a guessed prefix.</li>
         <li><code>.gitignore</code>'s coverage was verified functionally (<code>git check-ignore</code>), not just read — confirmed to actually exclude <code>.env.local</code>, <code>node_modules</code>, and build output at their real nested paths.</li>
       </ul>
-      <p style="margin-top:8px;">See <code>DECISIONS.md</code> for this audit logged as its own decision.</p>
+      <p style="margin-top:8px;">See <code>DECISIONS.md</code> for these audits logged as their own decisions.</p>
     </div>
 
     <div class="checklist-wrap">
       <ol>
         <li>
           Decide repository visibility (public/private) and final naming.
-          <p class="step-note">Not yet decided — a real choice for the user to make, not inferred from context.</p>
+          <span class="status-pill status-complete">Done</span>
+          <p class="step-note">Public, named <code>vanguard-ai-enabled</code>.</p>
         </li>
         <li>
           Create the new GitHub repository.
+          <span class="status-pill status-complete">Done</span>
+          <p class="step-note"><code>github.com/mcasey10/vanguard-ai-enabled</code>.</p>
         </li>
         <li>
           Add it as a remote and push.
-          <span class="step-flag confirm">Explicit confirmation required</span>
-          <p class="step-note">Same standing constraint that has applied every session of this project — no remote is created or pushed to without the user explicitly approving that specific action, at that specific point.</p>
+          <span class="status-pill status-complete">Done</span>
+          <p class="step-note">All work through D121 (and its own closing follow-up commit) is pushed to <code>origin/master</code> — confirmed directly by comparing local <code>HEAD</code> against a freshly-fetched <code>origin/master</code>, not inferred from the push command's own output. This required explicit user confirmation at the actual moment of each push, the same standing constraint that applied every session of this project — never assumed or batched without asking.</p>
         </li>
         <li>
           Connect the repository to Vercel.
+          <span class="status-pill status-complete">Done</span>
         </li>
         <li>
           Configure environment variables directly in Vercel's dashboard.
-          <span class="step-flag manual">Manual, human-only step</span>
-          <p class="step-note">Real API keys (Gemini/Groq/Anthropic) should never be typed by an agent into a third-party platform's credential fields — the same principle already applied to every credential-entry situation this project has encountered. Noted explicitly here so it isn't mistaken for something to automate later.</p>
+          <span class="status-pill status-complete">Done</span>
+          <p class="step-note">Entered by the user directly in Vercel's own dashboard — never by an agent typing a real key into a third-party platform's credential fields, the same principle already applied to every credential-entry situation this project has encountered.</p>
         </li>
         <li>
           Deploy, then verify the live URL actually works — specifically, confirm narration and the Scenario assistant function correctly against Vercel's configured environment, not just that the site loads.
-          <p class="step-note">Both features depend on a real, working API key reaching the deployed serverless functions (<code>api/narrate.ts</code>, <code>api/interpret.ts</code>) — a page that loads but silently falls back to deterministic text on every touchpoint would look like success without actually being it.</p>
+          <span class="status-pill status-complete">Done</span>
+          <p class="step-note">Both features depend on a real, working API key reaching the deployed serverless functions (<code>api/narrate.ts</code>, <code>api/interpret.ts</code>) — a page that loads but silently falls back to deterministic text on every touchpoint would look like success without actually being it. Verification wasn't a one-shot check: initial deployment surfaced a genuine <code>ERR_MODULE_NOT_FOUND</code> in production (Vercel's serverless runtime uses Node's native ESM loader, which requires explicit <code>.js</code> extensions on relative imports — a requirement <code>tsc</code>, Vitest, and the Vite dev server all silently permitted skipping). Traced to 19 files/40 imports across the full narrate/interpret/demo-config dependency graph, fixed, and given a dedicated <code>tsconfig.server.json</code> so it can't silently regress — logged as its own decision (D118) precisely because a passing local check had turned out to only be evidence about the runtime it actually exercises, not about Vercel's.</p>
         </li>
         <li>
           Final housekeeping: confirm the root-level README accurately describes this project before it's public.
-          <p class="step-note"><strong>Done.</strong> A real root-level <code>README.md</code> now exists — project purpose, verified run instructions (<code>cd dev && npm install && npm run dev</code>, real port <strong>5173</strong>), the required environment variables, pointers to <code>CLAUDE.md</code>/<code>DECISIONS.md</code>/this page, and an honest scope note. Every command and path in it was actually run, not just written as plausible-sounding instructions — including <code>npm test</code>, <code>npm run test:e2e</code>, and <code>npm run build</code>. One correction to this checklist's own earlier note: it previously claimed <code>dev/README.md</code>'s stated port (5173) didn't match "this project's actual dev server" — that claim was itself never verified and turned out to be wrong. <code>vite.config.ts</code> hardcodes 5173 as the real default (only overridden by a <code>PORT</code> env var this project's own tooling sets for its own sandboxed preview access), independently corroborated by <code>playwright.config.ts</code>'s own <code>baseURL</code>. <code>dev/README.md</code>'s port was correct all along — its real errors (the original project's deployment link, the Anthropic-only backend claim, a stale directory tree) are unrelated to the port and remain unaddressed, since fixing that file wasn't this task's scope.</p>
+          <span class="status-pill status-complete">Done</span>
+          <p class="step-note">A real root-level <code>README.md</code> exists — project purpose, verified run instructions (<code>cd dev && npm install && npm run dev</code>, real port <strong>5173</strong>), the required environment variables, pointers to <code>CLAUDE.md</code>/<code>DECISIONS.md</code>/this page, and an honest scope note. Every command and path in it was actually run, not just written as plausible-sounding instructions. Since made public, it also gained a live-deployment section (app URL, reset-state URL) and confirmation that its <code>docs/progress.html</code> link resolves correctly both on GitHub's normal repo view and on GitHub Pages.</p>
+        </li>
+        <li>
+          Enable GitHub Pages.
+          <span class="status-pill status-complete">Done</span>
+          <p class="step-note">Never listed as its own step at the time this checklist was first written, even though it happened — added here for an accurate record. Live and confirmed at <a href="https://mcasey10.github.io/vanguard-ai-enabled/" target="_blank" rel="noopener">mcasey10.github.io/vanguard-ai-enabled</a>, deploying from <code>master</code> / root — which, with no <code>index.html</code>/<code>index.md</code> of its own, means GitHub's default Jekyll processing serves this repository's own <code>README.md</code> as the Pages homepage.</p>
         </li>
       </ol>
     </div>
