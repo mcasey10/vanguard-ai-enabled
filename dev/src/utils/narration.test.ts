@@ -360,6 +360,43 @@ describe('narration coverage categories (CLAUDE.md §12)', () => {
     expect(system).toMatch(/never state per-asset-class allocation percentage shifts/i)
   })
 
+  // Segment C's own example-anchoring bug (cc-prompt-test-segment-c-anchoring.md):
+  // the prompt used to carry exactly one worked example, and its figures were
+  // identical to this project's own canonical test scenario ($15,000 VTSAX +
+  // $10,000 VBTLX = $64.85) — so a live generation for that exact scenario came
+  // back byte-identical to the example, and real generations for genuinely
+  // different transactions (different funds, different amounts) still echoed
+  // its "comes to an estimated net tax of $X" phrasing in 4 of 5 real calls.
+  // The same failure shape D113 found for Segment D, never checked for C.
+  // Also found in the process: the original example never actually led with
+  // the tax figure despite the instruction literally saying to — no real
+  // output ever front-loaded the figure until the example was fixed to match
+  // its own instruction. Multiple example-based fixes were tried (two examples,
+  // three examples, an example plus a negative counter-example); each one the
+  // model settled into rotating through the provided example(s) rather than
+  // genuinely varying, so the final fix removes quoted example sentences
+  // entirely in favor of abstract, non-copyable rules — re-verified with real
+  // output across five different transactions (single-fund and multi-fund,
+  // funds/amounts never used in the old example) plus a re-run of the
+  // canonical fixture: every real response front-loaded the dollar figure,
+  // held both content bans, and varied in actual sentence structure rather
+  // than reading as the same sentence with the numbers swapped.
+  test('Segment C prompt has no quoted example sentence left to anchor on, and instructs front-loading + genuine variation instead', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const input = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'C' })
+    const { system } = buildNarrationPrompt(input)
+    expect(system).toMatch(/as the very first word or clause of your sentence/i)
+    expect(system).toMatch(/should not read as the same sentence with the numbers swapped/i)
+    expect(system).toMatch(/do not add a trailing clause explaining what the sale accomplishes/i)
+    // The old single canonical example is gone entirely, not just relabeled —
+    // and no replacement quoted example sentence was added in its place either
+    // (every fix attempt that kept ANY quoted example, even a negative one,
+    // was itself echoed verbatim by real output during this investigation).
+    expect(system).not.toContain('Selling $15,000 of VTSAX and $10,000 of VBTLX comes to an estimated net tax of $64.85')
+    expect(system).not.toMatch(/\$210\.40|\$340\.00|\$115\.20 tax would apply to selling/) // no leftover quoted example from an earlier fix attempt
+  })
+
   test('D074: Segment D tone instructs plain-language jargon definitions and is built from segmentResearch.ts\'s own real quoted goal, not a re-typed copy', async () => {
     const { buildNarrationPrompt } = await import('../server/narrationPrompt')
     const { SEGMENT_PROFILES } = await import('./segmentResearch')
