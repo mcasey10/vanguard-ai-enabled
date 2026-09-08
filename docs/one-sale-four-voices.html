@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One Sale, Four Voices</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper: #f2f4f1;
+    --paper-raised: #ffffff;
+    --ink: #1b2420;
+    --ink-dim: #5c6b63;
+    --ink-faint: #8b978f;
+    --line: #d7ded8;
+    --line-strong: #c1cac3;
+    --accent: #8a6a1c;
+    --accent-strong: #6e5416;
+    --accent-soft: #f2e6c4;
+    --console-bg: #12181a;
+    --console-bg-raised: #1a2224;
+    --console-text: #dce8e1;
+    --console-dim: #8fa199;
+    --console-key: #d9b25c;
+    --console-string: #9fc4b0;
+    --console-line: #2a3532;
+    --good: #3f7a52;
+    --good-soft: #e2efe4;
+    --warn: #a1481f;
+    --warn-soft: #f5e4da;
+    --shadow: rgba(27, 36, 32, 0.08);
+
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #161c19;
+      --paper-raised: #1e2622;
+      --ink: #e7ece7;
+      --ink-dim: #a3b0a8;
+      --ink-faint: #6d7972;
+      --line: #303b35;
+      --line-strong: #3d4a42;
+      --accent: #dcb35f;
+      --accent-strong: #eec97d;
+      --accent-soft: #33301f;
+      --console-bg: #0c1112;
+      --console-bg-raised: #131a1c;
+      --console-text: #dce8e1;
+      --console-dim: #7f918a;
+      --console-key: #dcb35f;
+      --console-string: #8fc0a9;
+      --console-line: #232d2a;
+      --good: #6fbb84;
+      --good-soft: #1c2c20;
+      --warn: #d98457;
+      --warn-soft: #2e2016;
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #161c19;
+    --paper-raised: #1e2622;
+    --ink: #e7ece7;
+    --ink-dim: #a3b0a8;
+    --ink-faint: #6d7972;
+    --line: #303b35;
+    --line-strong: #3d4a42;
+    --accent: #dcb35f;
+    --accent-strong: #eec97d;
+    --accent-soft: #33301f;
+    --console-bg: #0c1112;
+    --console-bg-raised: #131a1c;
+    --console-text: #dce8e1;
+    --console-dim: #7f918a;
+    --console-key: #dcb35f;
+    --console-string: #8fc0a9;
+    --console-line: #232d2a;
+    --good: #6fbb84;
+    --good-soft: #1c2c20;
+    --warn: #d98457;
+    --warn-soft: #2e2016;
+    --shadow: rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 24px 120px;
+  }
+
+  a { color: var(--accent-strong); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  code, .mono { font-family: var(--font-mono); }
+
+  /* ---------- Header ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 14px; margin-bottom: 8px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(34px, 5vw, 50px);
+    line-height: 1.06;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .dek {
+    font-size: 18px;
+    color: var(--ink-dim);
+    max-width: 62ch;
+    margin: 4px 0 0;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+  }
+  .meta-row span b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Segment nav ---------- */
+
+  .segnav {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    gap: 2px;
+    margin: 40px 0 44px;
+    background: var(--paper);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .segnav a {
+    flex: 1;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--ink-dim);
+    text-decoration: none;
+    padding: 9px 6px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+  }
+  .segnav a:hover { border-color: var(--line-strong); color: var(--ink); }
+
+  /* ---------- Generic section rhythm ---------- */
+
+  section.block { display: flex; flex-direction: column; gap: 16px; margin-bottom: 64px; }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 26px;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 20px;
+    margin: 0;
+  }
+  p { margin: 0; }
+  .prose > * + * { margin-top: 14px; }
+
+  /* ---------- Ledger / receipt table ---------- */
+
+  .ledger {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 6px 22px;
+    box-shadow: 0 1px 2px var(--shadow);
+  }
+  .ledger-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 13px 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: 15px;
+  }
+  .ledger-row:last-child { border-bottom: none; }
+  .ledger-row.total { font-weight: 600; }
+  .ledger-label { color: var(--ink-dim); }
+  .ledger-label b { color: var(--ink); font-weight: 500; }
+  .ledger-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: right;
+  }
+  .ledger-value.gain { color: var(--good); }
+  .ledger-value.loss { color: var(--warn); }
+  .ledger-sub { font-size: 12.5px; color: var(--ink-faint); }
+
+  .alloc-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 4px; }
+  .alloc-table th, .alloc-table td {
+    padding: 9px 10px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid var(--line);
+  }
+  .alloc-table th:first-child, .alloc-table td:first-child {
+    text-align: left;
+    font-family: var(--font-body);
+    color: var(--ink-dim);
+  }
+  .alloc-table thead th {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .alloc-table .arrow { color: var(--ink-faint); padding: 0 4px; }
+  .table-scroll { overflow-x: auto; }
+
+  /* ---------- Console / code panels ---------- */
+
+  .console {
+    background: var(--console-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px var(--shadow);
+  }
+  .console-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--console-bg-raised);
+    border-bottom: 1px solid var(--console-line);
+  }
+  .console-label {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--console-dim);
+    font-weight: 600;
+  }
+  .console-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--console-key);
+    background: rgba(217, 178, 92, 0.12);
+    padding: 2px 8px;
+    border-radius: 100px;
+  }
+  .console pre {
+    margin: 0;
+    padding: 18px 20px 20px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--console-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .console pre.tight { white-space: pre; word-break: normal; }
+  .console .k { color: var(--console-key); }
+  .console .s { color: var(--console-string); }
+  .console .c { color: var(--console-dim); font-style: italic; }
+
+  details.console-fold summary {
+    cursor: pointer;
+    padding: 12px 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--console-dim);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  details.console-fold summary::-webkit-details-marker { display: none; }
+  details.console-fold summary::before {
+    content: "▸";
+    display: inline-block;
+    transition: transform 0.15s ease;
+  }
+  details.console-fold[open] summary::before { transform: rotate(90deg); }
+  details.console-fold summary .console-label { margin-right: auto; }
+
+  .field-note {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    line-height: 1.55;
+  }
+  .field-note b { color: var(--ink); }
+
+  /* ---------- Response card ---------- */
+
+  .response-card {
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+    border-radius: 12px;
+    padding: 22px 24px;
+    position: relative;
+  }
+  .response-card .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    margin-bottom: 12px;
+  }
+  .response-card .badge::before { content: "◆"; font-size: 9px; }
+  .response-card p {
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.68;
+    color: var(--ink);
+  }
+
+  /* ---------- Segment section ---------- */
+
+  .segment {
+    scroll-margin-top: 64px;
+    border-top: 1px solid var(--line-strong);
+    padding-top: 48px;
+    margin-bottom: 56px;
+  }
+  .segment-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
+  .segment-letter {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--paper);
+    background: var(--ink);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .segment-titles h2 { display: inline; }
+  .segment-persona { font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); display: block; margin-top: 2px; }
+  .segment-brief { color: var(--ink-dim); max-width: 62ch; margin: 14px 0 28px; font-size: 15px; }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .step:last-child { margin-bottom: 0; }
+  .step-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .step-label .num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+  }
+
+  .callout {
+    background: var(--warn-soft);
+    border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line));
+    border-radius: 10px;
+    padding: 16px 18px;
+    font-size: 14px;
+    color: var(--ink);
+    display: flex;
+    gap: 12px;
+  }
+  .callout .mark { color: var(--warn); font-family: var(--font-mono); font-weight: 700; }
+  .callout code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; }
+
+  footer.pagefoot {
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+    font-size: 13.5px;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+  }
+
+  @media (max-width: 620px) {
+    .segnav { overflow-x: auto; }
+    .segnav a { flex: none; padding: 9px 14px; }
+    .ledger-row { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .ledger-value { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="eyebrow">Narration architecture — worked example</span>
+    <h1>One Sale, Four Voices</h1>
+    <p class="dek">The same $25,000 transaction, the same real engine output, run through this app's actual narration prompt four times — once per reader-tone segment. Source code, assembled prompt, and a fresh live model response, side by side, for each.</p>
+    <div class="meta-row">
+      <span>Touchpoint: <b>Scenario Analysis tradeoff summary</b></span>
+      <span>Provider: <b>Groq · openai/gpt-oss-120b</b></span>
+      <span>Generated: <b>2026-09-08</b></span>
+      <span>Source: <b>dev/src/server/narrationPrompt.ts</b></span>
+    </div>
+  </header>
+
+  <nav class="segnav" aria-label="Jump to segment">
+    <a href="#segment-a">A · Strategic optimizer</a>
+    <a href="#segment-b">B · Routine executor</a>
+    <a href="#segment-c">C · Reactive withdrawer</a>
+    <a href="#segment-d">D · Newly self-directed</a>
+  </nav>
+
+  <section class="block">
+    <h2>The scenario</h2>
+    <div class="prose">
+      <p>A $25,000 sale from a Taxable Brokerage account, produced by this app's own tax-first automated optimizer — sell $15,000 of VTSAX and $10,000 of VBTLX, both MinTax. Every figure below was read directly from a live call to <code>runOptimization()</code> just before this page was built, not carried over from an earlier screenshot — real cost-basis lots shift which are short-term vs. long-term as calendar time passes, so the exact gain figures here are specific to today, not a fixed constant of this project.</p>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger-row">
+        <span class="ledger-label"><b>VTSAX</b> — Total Stock Market · $15,000.00 · MinTax</span>
+        <span class="ledger-value gain">+$1,322.31 ST<span class="ledger-sub"> · tax $317.35</span></span>
+      </div>
+      <div class="ledger-row">
+        <span class="ledger-label"><b>VBTLX</b> — Total Bond Market · $10,000.00 · MinTax</span>
+        <span class="ledger-value loss">−$1,052.12 LT<span class="ledger-sub"> · tax $0.00</span></span>
+      </div>
+      <div class="ledger-row">
+        <span class="ledger-label">Net taxable gain</span>
+        <span class="ledger-value">$270.19</span>
+      </div>
+      <div class="ledger-row total">
+        <span class="ledger-label">Estimated net tax</span>
+        <span class="ledger-value">$64.85 <span class="ledger-sub">— effective rate 0.26%</span></span>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table class="alloc-table">
+        <thead>
+          <tr><th>Asset class</th><th>Before</th><th></th><th>After</th><th>Target</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Domestic equity</td><td>41.75%</td><td class="arrow">→</td><td>41.21%</td><td>40%</td></tr>
+          <tr><td>International equity</td><td>16.02%</td><td class="arrow">→</td><td>16.50%</td><td>15%</td></tr>
+          <tr><td>Domestic bonds</td><td>32.53%</td><td class="arrow">→</td><td>32.31%</td><td>35%</td></tr>
+          <tr><td>Short-term reserves</td><td>9.69%</td><td class="arrow">→</td><td>9.98%</td><td>10%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="field-note">Real market-context figures also feed the prompt: VTSAX has returned <b>29.41%</b> and VBTLX <b>6.42%</b> over their trailing 12 months, as of this dataset's fixed reference date.</p>
+  </section>
+
+  <section class="block">
+    <h2>How the prompt is actually built</h2>
+    <div class="prose">
+      <p><code>buildNarrationPrompt()</code> joins a fixed 15-part system-instruction array with one space. Thirteen parts never change. Two do: the tense instruction (always <em>prospective</em> here — nothing has executed yet) and <code>SEGMENT_TONE[input.segment]</code> — the one block that actually differs across this page's four sections below. The user message is a plain <code>JSON.stringify()</code> of the figures ledger above, with <code>touchpoint</code>/<code>tense</code>/<code>segment</code> stripped out — <b>byte-identical across all four segments</b>, shown once here rather than repeated four times.</p>
+    </div>
+
+    <div class="console">
+      <div class="console-head">
+        <span class="console-label">dev/src/server/narrationPrompt.ts</span>
+        <span class="console-tag">real source</span>
+      </div>
+      <pre class="tight"><span class="c">// the shared assembly — same for every touchpoint and segment</span>
+<span class="k">export function</span> buildNarrationPrompt(input: NarrationInput) {
+  <span class="k">const</span> system = [
+    <span class="s">'You write short, factual narration for a brokerage sell/rebalance tool, addressed directly to the account holder — write as if explaining the transaction to them in conversation, never as if reciting a data structure.'</span>,
+    <span class="s">'You may ONLY describe figures given to you in the user message below — never state, estimate, imply, or round a number that is not present verbatim in that data.'</span>,
+    TENSE_INSTRUCTION[input.tense],
+    <span class="c">// ...four more fixed formatting/framing rules...</span>
+    <span class="s">'"effective_rate", if present, is already expressed as a percentage number — state it with a "%" sign using that value directly (e.g. "0.26" means "0.26%", not "26%")...'</span>,
+    <span class="c">// ...three more fixed rules (market context, Traditional IRA framing, early-withdrawal, assistive posture)...</span>
+    SEGMENT_TONE[input.segment],  <span class="c">← the one part that changes below</span>
+    TOUCHPOINT_FRAMING[input.touchpoint],
+    <span class="s">'Output prose only — no headers, no bullet points, no markdown.'</span>,
+    <span class="s">'Respond with the final narration and nothing else: a single continuous block of text... Do not include a draft, an alternate attempt, a self-correction... — only the finished narration itself, exactly once.'</span>,  <span class="c">← added D124, after a real leaked-draft response was found</span>
+  ].join(<span class="s">' '</span>)
+
+  <span class="k">const</span> { touchpoint, tense, segment, ...figures } = input
+  <span class="k">const</span> user = JSON.stringify(figures, <span class="k">null</span>, 2)
+  <span class="k">return</span> { system, user }
+}</pre>
+    </div>
+
+    <details class="console-fold">
+      <summary><span class="console-label">Shared user message — identical for all four segments below</span><span class="console-tag">click to expand</span></summary>
+      <div class="console" style="border-radius:0;">
+        <pre>{
+  <span class="k">"funds"</span>: [
+    {
+      <span class="k">"fund_id"</span>: <span class="s">"VTSAX"</span>,
+      <span class="k">"fund_name"</span>: <span class="s">"Vanguard Total Stock Market Index Fund Admiral Shares"</span>,
+      <span class="k">"asset_class"</span>: <span class="s">"domestic_equity"</span>,
+      <span class="k">"account_type"</span>: <span class="s">"taxable_brokerage"</span>,
+      <span class="k">"accounting_method"</span>: <span class="s">"MinTax"</span>,
+      <span class="k">"sell_amount"</span>: 15000,
+      <span class="k">"st_gain_loss"</span>: 1322.31,
+      <span class="k">"lt_gain_loss"</span>: 0,
+      <span class="k">"est_tax_gross"</span>: 317.35,
+      <span class="k">"lots"</span>: [{ <span class="k">"lot_id"</span>: <span class="s">"T-VTSAX-08"</span>, <span class="k">"acquisition_date"</span>: <span class="s">"2025-08-15"</span>, <span class="k">"holding_period"</span>: <span class="s">"ST"</span>, <span class="k">"realized_gain_loss"</span>: 1322.31 }],
+      <span class="k">"market_context_return_pct"</span>: 29.41
+    },
+    {
+      <span class="k">"fund_id"</span>: <span class="s">"VBTLX"</span>,
+      <span class="k">"fund_name"</span>: <span class="s">"Vanguard Total Bond Market Index Fund Admiral Shares"</span>,
+      <span class="k">"asset_class"</span>: <span class="s">"domestic_bonds"</span>,
+      <span class="k">"account_type"</span>: <span class="s">"taxable_brokerage"</span>,
+      <span class="k">"accounting_method"</span>: <span class="s">"MinTax"</span>,
+      <span class="k">"sell_amount"</span>: 10000,
+      <span class="k">"st_gain_loss"</span>: 0,
+      <span class="k">"lt_gain_loss"</span>: -1052.12,
+      <span class="k">"est_tax_gross"</span>: 0,
+      <span class="k">"lots"</span>: [{ <span class="k">"lot_id"</span>: <span class="s">"T-VBTLX-02"</span>, <span class="k">"acquisition_date"</span>: <span class="s">"2021-10-20"</span>, <span class="k">"holding_period"</span>: <span class="s">"LT"</span>, <span class="k">"realized_gain_loss"</span>: -1052.12 }],
+      <span class="k">"market_context_return_pct"</span>: 6.42
+    }
+  ],
+  <span class="k">"est_net_tax"</span>: 64.85,
+  <span class="k">"effective_rate"</span>: 0.26,
+  <span class="k">"losses_harvested"</span>: -1052.12,
+  <span class="k">"allocation_impact"</span>: {
+    <span class="k">"before"</span>: { <span class="k">"domestic_equity"</span>: 41.75, <span class="k">"international_equity"</span>: 16.02, <span class="k">"domestic_bonds"</span>: 32.53, <span class="k">"short_term_reserves"</span>: 9.69 },
+    <span class="k">"after"</span>:  { <span class="k">"domestic_equity"</span>: 41.21, <span class="k">"international_equity"</span>: 16.5,  <span class="k">"domestic_bonds"</span>: 32.31, <span class="k">"short_term_reserves"</span>: 9.98 },
+    <span class="k">"target"</span>: { <span class="k">"domestic_equity"</span>: 40,    <span class="k">"international_equity"</span>: 15,   <span class="k">"domestic_bonds"</span>: 35,    <span class="k">"short_term_reserves"</span>: 10 }
+  }
+}</pre>
+      </div>
+    </details>
+
+    <p class="field-note"><b>Tense instruction</b> (shared, since nothing here has executed): <em>"This transaction has NOT been executed — it is a proposed plan the reader is still reviewing, not a completed action. Narrate it in a proposed/conditional frame... NEVER use past-tense/completed-action phrasing."</em> · <b>Touchpoint framing</b> (shared): <em>"Summarize the tradeoff this scenario represents relative to its tax cost and its effect on portfolio allocation."</em></p>
+  </section>
+
+  <!-- ============ SEGMENT A ============ -->
+  <section class="segment" id="segment-a">
+    <div class="segment-head">
+      <span class="segment-letter">A</span>
+      <div class="segment-titles">
+        <h2>Segment A</h2>
+        <span class="segment-persona">Strategic optimizer — prefers data over interpretation, figure-forward brevity</span>
+      </div>
+    </div>
+    <p class="segment-brief">One short, strictly figure-led sentence per fund, then a rollup — no explanation of <em>why</em>, just what happened and the resulting numbers.</p>
+
+    <div class="step">
+      <span class="step-label"><span class="num">1</span>Coding template — real source, <code>narrationPrompt.ts</code> line 37</span>
+      <div class="console">
+        <pre>SEGMENT_TONE.A = <span class="s">'Segment A prefers data over interpretation and figure-forward brevity. Structure by fund count, not by a fixed sentence limit: for a SINGLE fund, write exactly ONE short, strictly figure-led sentence (~25 words) stating what happened and the resulting figures, with no explanation of why. For MULTIPLE funds, write ONE short sentence PER FUND, each following that same single-fund rule — never chain multiple funds together into one long sentence with commas/"alongside"/"plus"/"and". Every sentence should read as its own standalone, scannable statement. Example, one fund (shown in past tense for illustration only...): "Sold $21,780.00 of VTSAX (150 shares, FIFO), realizing a $1,920.00 short-term gain; est. tax $105.78." Example, two funds (two separate sentences, not one): "Sold $21,780.00 of VTSAX (150 shares, FIFO)... Sold $16,000.00 of VBTLX (MinTax)..." A four-fund transaction gets four short sentences, not one sentence with four clauses.'</span></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">2</span>Assembled prompt — sent to the API exactly as shown</span>
+      <div class="console">
+        <div class="console-head"><span class="console-label">system message</span><span class="console-tag">resolved</span></div>
+        <pre>You write short, factual narration for a brokerage sell/rebalance tool, addressed directly to the account holder — write as if explaining the transaction to them in conversation, never as if reciting a data structure. You may ONLY describe figures given to you in the user message below — never state, estimate, imply, or round a number that is not present verbatim in that data. This transaction has NOT been executed — it is a proposed plan the reader is still reviewing, not a completed action. Narrate it in a proposed/conditional frame ("Selling $X would realize...", "This would sell $X of...", "would result in..."). NEVER use past-tense/completed-action phrasing ("Sold $X", "realized a gain") — the sale has not happened yet. Never use a field's internal name in your output — describe what a figure means in plain words instead... Omit any figure that is exactly zero and would add no information for the reader... Format every dollar figure with a leading "$" and comma thousands separators and two decimal places... "effective_rate", if present, is already expressed as a percentage number — state it with a "%" sign using that value directly (e.g. "0.26" means "0.26%", not "26%"; "2.12" means "2.12%"). Never multiply or divide it by 100 again before stating it. A "market_context_return_pct" figure, if present, is that FUND's own trailing-12-month total return... If a fund line has account_type "traditional_IRA": do not lead with, dwell on, or simply negate the gain/loss figure... Only mention an early withdrawal penalty if "est_early_withdrawal_penalty" is present... Be assistive, not directive... <b style="color:var(--console-key)">Segment A prefers data over interpretation and figure-forward brevity. Structure by fund count, not by a fixed sentence limit: for a SINGLE fund, write exactly ONE short, strictly figure-led sentence (~25 words)... For MULTIPLE funds, write ONE short sentence PER FUND... never chain multiple funds together into one long sentence with commas/"alongside"/"plus"/"and".</b> Summarize the tradeoff this scenario represents relative to its tax cost and its effect on portfolio allocation. Output prose only — no headers, no bullet points, no markdown. Respond with the final narration and nothing else: a single continuous block of text, never split across multiple paragraphs. Do not include a draft, an alternate attempt, a self-correction, or any commentary about these instructions — only the finished narration itself, exactly once.</pre>
+      </div>
+      <p class="field-note">User message: identical to the shared payload above ↑</p>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">3</span>Real generated response — live, read cold</span>
+      <div class="response-card">
+        <span class="badge">AI-generated</span>
+        <p>Selling $15,000.00 of VTSAX would realize a $1,322.31 short‑term gain; est. tax $317.35. Selling $10,000.00 of VBTLX would realize a $1,052.12 long‑term loss. Overall, the plan would result in an estimated net tax of $64.85 (effective rate 0.26%) and shift portfolio allocation from 41.75% to 41.21% domestic equity, 16.02% to 16.5% international equity, 32.53% to 32.31% domestic bonds, and 9.69% to 9.98% short‑term reserves.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SEGMENT B ============ -->
+  <section class="segment" id="segment-b">
+    <div class="segment-head">
+      <span class="segment-letter">B</span>
+      <div class="segment-titles">
+        <h2>Segment B</h2>
+        <span class="segment-persona">Routine executor — wants the reasoning, not just the figures</span>
+      </div>
+    </div>
+    <p class="segment-brief">Two to three plain-language sentences explaining <em>why</em> the sale makes sense — tax efficiency, allocation effect — not merely restating the numbers.</p>
+
+    <div class="step">
+      <span class="step-label"><span class="num">1</span>Coding template — real source, <code>narrationPrompt.ts</code> line 38</span>
+      <div class="console">
+        <pre>SEGMENT_TONE.B = <span class="s">'Write two to three plain-language sentences that explain the reasoning behind the figures, not just the figures themselves — why this sale makes sense (tax efficiency, allocation effect), not merely what the numbers are. Example of the right depth: "Selling this lot realizes a modest short-term gain while trimming an overweight equity position, which nudges the portfolio a bit closer to its target mix. The resulting tax cost is small relative to the amount sold." Noticeably more explanatory than segment A — if your segment-B output would read almost the same as a segment-A output for the same figures, add more of the "why," not more figures.'</span></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">2</span>Assembled prompt — sent to the API exactly as shown</span>
+      <div class="console">
+        <div class="console-head"><span class="console-label">system message</span><span class="console-tag">resolved</span></div>
+        <pre>You write short, factual narration for a brokerage sell/rebalance tool, addressed directly to the account holder — write as if explaining the transaction to them in conversation, never as if reciting a data structure. You may ONLY describe figures given to you in the user message below — never state, estimate, imply, or round a number that is not present verbatim in that data. This transaction has NOT been executed — it is a proposed plan the reader is still reviewing, not a completed action. Narrate it in a proposed/conditional frame... NEVER use past-tense/completed-action phrasing... Never use a field's internal name in your output... Omit any figure that is exactly zero... Format every dollar figure with a leading "$"... "effective_rate", if present, is already expressed as a percentage number — state it with a "%" sign using that value directly (e.g. "0.26" means "0.26%", not "26%")... A "market_context_return_pct" figure, if present, is that FUND's own trailing-12-month total return... If a fund line has account_type "traditional_IRA"... Only mention an early withdrawal penalty if present... Be assistive, not directive, not directive (do not tell the reader what they should do)... <b style="color:var(--console-key)">Write two to three plain-language sentences that explain the reasoning behind the figures, not just the figures themselves — why this sale makes sense (tax efficiency, allocation effect), not merely what the numbers are... Noticeably more explanatory than segment A.</b> Summarize the tradeoff this scenario represents relative to its tax cost and its effect on portfolio allocation. Output prose only — no headers, no bullet points, no markdown. Respond with the final narration and nothing else: a single continuous block of text, never split across multiple paragraphs. Do not include a draft, an alternate attempt, a self-correction, or any commentary about these instructions — only the finished narration itself, exactly once.</pre>
+      </div>
+      <p class="field-note">User message: identical to the shared payload above ↑</p>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">3</span>Real generated response — live, read cold</span>
+      <div class="response-card">
+        <span class="badge">AI-generated</span>
+        <p>Selling $15,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares would realize a short‑term gain of $1,322.31 and incur a tax cost of $317.35, while selling $10,000.00 of Vanguard Total Bond Market Index Fund Admiral Shares would realize a long‑term loss of $1,052.12 that offsets part of that tax; the combined estimated net tax on the $25,000.00 of sales is $64.85, reflecting an effective tax rate of 0.26%. The transactions would shift the portfolio composition slightly — domestic equity would move from 41.75% to 41.21%, domestic bonds from 32.53% to 32.31%, international equity from 16.02% to 16.5%, and short‑term reserves from 9.69% to 9.98% — bringing the mix a bit closer to the target allocations.</p>
+      </div>
+      <p class="callout"><span class="mark">Note</span><span>An earlier attempt at this exact segment/prompt, in this page's original live run, stated a tax rate against <code>"$12,247.19 of realized gain"</code> — a figure that appears nowhere in the input above and doesn't correspond to any real combination of it. Discarded, not included as one of the four responses on this page. It's left here as an honest data point: this project's accuracy fixes (see D119) make the model far more likely to state real figures correctly, but they don't make free-form generation infallible — which is exactly why nothing downstream in this app ever treats a model-stated number as a source of truth. (A second, unrelated attempt while refreshing this page after D124 also invented a nonexistent "$5,000.00 of realized gain" figure — discarded the same way, for the same reason.)</span></p>
+    </div>
+  </section>
+
+  <!-- ============ SEGMENT C ============ -->
+  <section class="segment" id="segment-c">
+    <div class="segment-head">
+      <span class="segment-letter">C</span>
+      <div class="segment-titles">
+        <h2>Segment C</h2>
+        <span class="segment-persona">Reactive withdrawer — fastest credible path to executing a specific dollar amount</span>
+      </div>
+    </div>
+    <p class="segment-brief">The shortest possible phrasing, headline figure first — and two hard content bans: no ST/LT breakdown, no per-asset-class allocation shift, ever.</p>
+
+    <p class="callout"><span class="mark">Revised after publish</span><span>This section originally showed a version of the prompt with one quoted worked example — whose figures happened to be identical to this page's own canonical scenario. A live call for that exact scenario came back byte-identical to the example, and testing against genuinely different transactions found the same anchoring in 4 of 5 real calls, all echoing the example's exact phrase regardless of the real numbers. The fix below replaces the quoted example with abstract, non-copyable rules — see the note under step 3 for the full finding and what was tried before landing here.</span></p>
+
+    <div class="step">
+      <span class="step-label"><span class="num">1</span>Coding template — real source, <code>narrationPrompt.ts</code> line 48</span>
+      <div class="console">
+        <pre>SEGMENT_TONE.C = <span class="k">`</span><span class="s">Segment C (${SEGMENT_PROFILES.C.name}) is under real time pressure — goal: "${SEGMENT_PROFILES.C.goal}." Write the SHORTEST possible phrasing: one short sentence, no subordinate clauses, no explanation of reasoning, and no suggestion to pause, compare, or reconsider. State the dollar tax figure as the very first word or clause of your sentence — before naming any fund, before describing what was sold, before anything else; never lead with "Selling" or "Sold," which puts the transaction before the figure, exactly backwards. There is no single correct sentence shape for this: construct a fresh, natural-sounding way to lead with the figure each time rather than defaulting to a repeated template — two responses to two different transactions should not read as the same sentence with the numbers swapped. Two explicit content rules for this segment: (1) NEVER state the short-term and long-term gain/loss breakdown separately — state only the single net tax figure; (2) NEVER state per-asset-class allocation percentage shifts — not even a qualitative mention of an allocation effect, even as a trailing clause that otherwise reads naturally. Stop the sentence immediately after stating the fund(s) and dollar amount(s) sold — a natural-sounding sentence that ends there is not incomplete, it is the goal. What this reader needs the tool to avoid: ${SEGMENT_PROFILES.C.toolMustAvoid}.</span><span class="k">`</span></pre>
+      </div>
+      <p class="field-note"><b>No quoted example sentence anywhere in this block</b> — the deliberate fix, after three example-based attempts (one example, two examples, an example plus a negative counter-example) each still got copied verbatim by real output. <b>segmentResearch.ts</b> resolves: <code>name</code> = <span class="mono">"Reactive withdrawer"</span> · <code>goal</code> = <span class="mono">"Fastest credible path to executing a specific dollar amount"</span> · <code>toolMustAvoid</code> = <span class="mono">"Scenario comparison, tax detail, anything that reads as optional extra work"</span></p>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">2</span>Assembled prompt — sent to the API exactly as shown</span>
+      <div class="console">
+        <div class="console-head"><span class="console-label">system message</span><span class="console-tag">resolved</span></div>
+        <pre>You write short, factual narration for a brokerage sell/rebalance tool, addressed directly to the account holder... You may ONLY describe figures given to you in the user message below... This transaction has NOT been executed... NEVER use past-tense/completed-action phrasing... Never use a field's internal name in your output... Omit any figure that is exactly zero... Format every dollar figure with a leading "$"... "effective_rate", if present, is already expressed as a percentage number... A "market_context_return_pct" figure, if present... If a fund line has account_type "traditional_IRA"... Only mention an early withdrawal penalty if present... Be assistive, not directive... <b style="color:var(--console-key)">Segment C (Reactive withdrawer) is under real time pressure — goal: "Fastest credible path to executing a specific dollar amount." Write the SHORTEST possible phrasing: one short sentence, no subordinate clauses, no explanation of reasoning, and no suggestion to pause, compare, or reconsider. State the dollar tax figure as the very first word or clause of your sentence — before naming any fund, before describing what was sold, before anything else; never lead with "Selling" or "Sold." There is no single correct sentence shape for this: construct a fresh, natural-sounding way to lead with the figure each time rather than defaulting to a repeated template. (1) NEVER state the short-term and long-term gain/loss breakdown separately — state only the single net tax figure; (2) NEVER state per-asset-class allocation percentage shifts — not even a qualitative mention, even as a trailing clause. Stop the sentence immediately after stating the fund(s) and dollar amount(s) sold. What this reader needs the tool to avoid: Scenario comparison, tax detail, anything that reads as optional extra work.</b> Summarize the tradeoff this scenario represents relative to its tax cost and its effect on portfolio allocation. Output prose only — no headers, no bullet points, no markdown. Respond with the final narration and nothing else: a single continuous block of text, never split across multiple paragraphs. Do not include a draft, an alternate attempt, a self-correction, or any commentary about these instructions — only the finished narration itself, exactly once.</pre>
+      </div>
+      <p class="field-note">User message: identical to the shared payload above ↑</p>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">3</span>Real generated response — live, read cold</span>
+      <div class="response-card">
+        <span class="badge">AI-generated</span>
+        <p>$64.85 would be the estimated tax on selling $15,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares and $10,000.00 of Vanguard Total Bond Market Index Fund Admiral Shares.</p>
+      </div>
+      <p class="callout"><span class="mark">Finding</span><span>The version of this prompt shown when this page first published had exactly one quoted example, and that example's figures were identical to this page's own canonical scenario ("Selling $15,000 of VTSAX and $10,000 of VBTLX comes to an estimated net tax of $64.85"). A live call for this exact scenario came back <em>byte-identical</em> to that example. Testing against genuinely different transactions (different funds, different amounts) found the same pattern in 4 of 5 real calls — each echoing the example's exact phrase "comes to an estimated net tax of" regardless of what the real transaction actually was. The same failure shape this project's Segment D wording had already been caught and fixed for once (D113), never checked for Segment C until now. Two example-based fixes (two differently-worded examples, then three) reduced but didn't eliminate it — real output settled into rotating through whichever fixed examples were offered instead of genuinely varying. The fix that actually worked removed quoted example sentences from the prompt entirely, replacing them with abstract, non-copyable rules — re-verified against five different real transactions, every one now front-loading the dollar figure (the original example never actually did, despite its own instruction saying to) and varying in real sentence structure rather than reading as one template with the numbers swapped.</span></p>
+      <p class="field-note">Also re-verified after D124's separate leaked-draft fix (see "How the prompt is actually built" above): this exact input, run again real and cold, still comes back as one clean sentence.</p>
+    </div>
+  </section>
+
+  <!-- ============ SEGMENT D ============ -->
+  <section class="segment" id="segment-d">
+    <div class="segment-head">
+      <span class="segment-letter">D</span>
+      <div class="segment-titles">
+        <h2>Segment D</h2>
+        <span class="segment-persona">Newly self-directed — comprehension before optimization</span>
+      </div>
+    </div>
+    <p class="segment-brief">Orient before naming a single fund or figure, define jargon in plain words on first use, reassuring plain-language tone throughout.</p>
+
+    <div class="step">
+      <span class="step-label"><span class="num">1</span>Coding template — real source, <code>narrationPrompt.ts</code> line 49</span>
+      <div class="console">
+        <pre>SEGMENT_TONE.D = <span class="k">`</span><span class="s">Segment D (${SEGMENT_PROFILES.D.name}) needs comprehension before anything else — goal: "${SEGMENT_PROFILES.D.goal}." What this reader's own research says the tool must do: "${SEGMENT_PROFILES.D.toolMust}." Write two to three sentences in a reassuring, plain-language tone, assuming little familiarity with investing/tax terminology — define jargon in plain words the first time it appears (e.g. instead of "cost basis," say "what was originally paid for these shares"). Your FIRST sentence must orient the reader in general terms — what kind of thing they're looking at and why — BEFORE any specific fund name or dollar figure appears anywhere in the response... Phrase this orienting sentence in your own words each time — vary the wording; do not default to the same opening phrase every time... Only after that orienting sentence should you name the specific fund(s) and dollar amount(s), and only then acknowledge the outcome... What this reader needs the tool to avoid: ${SEGMENT_PROFILES.D.toolMustAvoid}.</span><span class="k">`</span></pre>
+      </div>
+      <p class="field-note"><b>segmentResearch.ts</b> resolves: <code>name</code> = <span class="mono">"Newly self-directed"</span> · <code>goal</code> = <span class="mono">"Comprehension before optimization — understand what is happening"</span> · <code>toolMust</code> = <span class="mono">"Orientation before action, plain-language rationale, comfort with incomplete sessions"</span> · <code>toolMustAvoid</code> = <span class="mono">"Leading with a recommendation before establishing comprehension"</span></p>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">2</span>Assembled prompt — sent to the API exactly as shown</span>
+      <div class="console">
+        <div class="console-head"><span class="console-label">system message</span><span class="console-tag">resolved</span></div>
+        <pre>You write short, factual narration for a brokerage sell/rebalance tool, addressed directly to the account holder... You may ONLY describe figures given to you in the user message below... This transaction has NOT been executed... NEVER use past-tense/completed-action phrasing... Never use a field's internal name in your output... Omit any figure that is exactly zero... Format every dollar figure with a leading "$"... "effective_rate", if present, is already expressed as a percentage number... A "market_context_return_pct" figure, if present... If a fund line has account_type "traditional_IRA"... Only mention an early withdrawal penalty if present... Be assistive, not directive... <b style="color:var(--console-key)">Segment D (Newly self-directed) needs comprehension before anything else — goal: "Comprehension before optimization — understand what is happening." What this reader's own research says the tool must do: "Orientation before action, plain-language rationale, comfort with incomplete sessions." Write two to three sentences in a reassuring, plain-language tone... define jargon in plain words the first time it appears... Your FIRST sentence must orient the reader in general terms... BEFORE any specific fund name or dollar figure appears anywhere in the response... What this reader needs the tool to avoid: Leading with a recommendation before establishing comprehension.</b> Summarize the tradeoff this scenario represents relative to its tax cost and its effect on portfolio allocation. Output prose only — no headers, no bullet points, no markdown. Respond with the final narration and nothing else: a single continuous block of text, never split across multiple paragraphs. Do not include a draft, an alternate attempt, a self-correction, or any commentary about these instructions — only the finished narration itself, exactly once.</pre>
+      </div>
+      <p class="field-note">User message: identical to the shared payload above ↑</p>
+    </div>
+
+    <div class="step">
+      <span class="step-label"><span class="num">3</span>Real generated response — live, read cold</span>
+      <div class="response-card">
+        <span class="badge">AI-generated</span>
+        <p>Here's a look at what a proposed sale of part of your portfolio would mean before any changes are finalized. The plan would sell $15,000.00 of Vanguard Total Stock Market Index Fund Admiral Shares, which were bought on August 15 2025, so the gain would be considered short‑term (held less than a year). That sale would generate a short‑term gain of $1,322.31, leading to an estimated tax of $317.35 on that portion. It would also sell $10,000.00 of Vanguard Total Bond Market Index Fund Admiral Shares, held since October 20 2021, so the loss would be long‑term (held more than a year). That sale would realize a long‑term loss of $1,052.12, which can be used to offset the stock gain and results in a net estimated tax of $64.85 for the whole transaction, an effective tax rate of 0.26%. VTSAX has returned 29.41% over the trailing 12 months, while VBTLX has returned 6.42% over the trailing 12 months. After these sales, your domestic equity allocation would shift from about 41.75% to 41.21%, international equity would rise from 16.02% to 16.5%, domestic bonds would drop from 32.53% to 32.31%, and short‑term reserves would increase from 9.69% to 9.98%, moving you a little closer to your target of 40% domestic equity, 15% international equity, 35% domestic bonds, and 10% short‑term reserves.</p>
+      </div>
+      <p class="field-note">Orientation held: the first clause names no fund and no figure. Jargon defined inline on first use, exactly as instructed.</p>
+    </div>
+  </section>
+
+  <footer class="pagefoot">
+    Every figure and response on this page came from a real, live call to this repo's own engine and its active narration provider, refreshed most recently on 2026-09-08 after D124 — nothing here is illustrative or reconstructed from an earlier session. Segment C's section was revised once (D123, the same example-anchoring bug D113 had found and fixed for Segment D, never checked for C until then) and all four segments' assembled prompts and responses were refreshed again once D124 added a shared instruction against leaked-draft responses (found live: a real response containing a rule-violating draft paragraph followed by a compliant final sentence) plus a real server-side check for the same failure shape. Full mechanism and every decision behind it: <code>CLAUDE.md</code> §7, <code>DECISIONS.md</code> D045/D047/D062/D074/D112/D113/D119/D123/D124.
+  </footer>
+
+</div>
+</body>
+</html>
