@@ -9,6 +9,7 @@
  */
 
 import { getActiveGenerator, NarrationApiError } from '../src/server/narrationGenerator.js'
+import { isMalformedNarrationText } from '../src/server/narrationValidation.js'
 import type { NarrationInput } from '../src/utils/narrationShared.js'
 
 interface VercelLikeRequest {
@@ -76,6 +77,20 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
 
   try {
     const text = await generator.generate(input)
+    // A prompt instruction alone is not a guarantee (the same principle
+    // whatIfValidation.ts already established for Feature 2) — a real
+    // response has been observed containing a rule-violating draft
+    // paragraph followed by a compliant final sentence, with nothing
+    // checking the shape of the response before this point. Treated the
+    // same as any other generation failure: the client's existing catch
+    // already falls back to the deterministic summary on a non-200, so
+    // there is nothing safe to salvage from a malformed response here —
+    // see narrationValidation.ts for why "keep the last paragraph" isn't
+    // the chosen repair.
+    if (isMalformedNarrationText(text)) {
+      res.status(502).json({ error: 'Narration response was malformed', providerName: generator.name })
+      return
+    }
     res.status(200).json({ text, providerName: generator.name })
   } catch (err) {
     const message = err instanceof NarrationApiError ? err.message : 'Narration generation failed'

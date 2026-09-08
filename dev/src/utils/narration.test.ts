@@ -775,8 +775,79 @@ describe('effective-rate units and target-allocation accuracy regression guard',
 })
 
 // ---------------------------------------------------------------------------
-// Additional coverage: CD-4.2 boundary, failure fallback, market-data rule 1
+// Leaked-draft regression guard (cc-prompt-leaked-draft-and-sync.md): a real
+// Groq call, found while verifying D123's Segment C fix, returned a response
+// whose text contained two paragraphs — a rule-violating draft followed by a
+// compliant final sentence — with nothing checking the response's shape
+// before this. Breadth investigation (8 real Groq calls across all four
+// segments, 6 real Gemini calls across all four segments) found this
+// correlates with Groq specifically (a reasoning model) — 1 real leak
+// observed across roughly 23 real Groq calls made investigating this and the
+// Segment C anchoring bug together, 0 across 6 real Gemini calls — not with
+// any one segment. Fixed at two layers, mirroring whatIfValidation.ts's
+// "prompt instruction alone is not a guarantee" precedent: an explicit new
+// system-prompt instruction (prevention), plus isMalformedNarrationText()
+// wired into dev/api/narrate.ts, returning a 502 (falls back to the
+// deterministic summary via the client's existing failure path) rather than
+// ever rendering a multi-paragraph response (detection).
 // ---------------------------------------------------------------------------
+
+describe('leaked-draft regression guard — malformed multi-paragraph response detection', () => {
+  test('isMalformedNarrationText: a single continuous block, even multi-sentence, is not malformed', async () => {
+    const { isMalformedNarrationText } = await import('../server/narrationValidation')
+    expect(isMalformedNarrationText('Selling $15,000.00 of VTSAX would realize a gain. Est. tax $317.35.')).toBe(false)
+  })
+
+  test('isMalformedNarrationText: two blocks separated by a blank line is malformed — the exact shape of the real observed leak', async () => {
+    const { isMalformedNarrationText } = await import('../server/narrationValidation')
+    const real = 'Selling $12,000.00 of Vanguard Total International Stock Index Fund Admiral Shares would realize a short-term gain of $480.00 and result in an estimated tax of $115.20 at an effective rate of 0.96%. This trade would lower international-equity weight from about 16.02% to 14.85%.\n\n$115.20 tax on selling $12,000.00 of Vanguard Total International Stock Index Fund Admiral Shares.'
+    expect(isMalformedNarrationText(real)).toBe(true)
+  })
+
+  test('isMalformedNarrationText: leading/trailing whitespace and a single trailing blank line do not themselves count as a second block', async () => {
+    const { isMalformedNarrationText } = await import('../server/narrationValidation')
+    expect(isMalformedNarrationText('\n  Selling $8,000.00 of VBTLX comes to $0.00 in tax.  \n\n')).toBe(false)
+  })
+
+  test('the prompt explicitly instructs a single final response, not just "no markdown" — a genuinely new rule, not a restatement of the existing one', async () => {
+    const { buildNarrationPrompt } = await import('../server/narrationPrompt')
+    const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+    const input = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'A' })
+    const { system } = buildNarrationPrompt(input)
+    // The pre-existing rule governs markdown syntax only — confirm the new
+    // rule is additional text, not something already covered by it.
+    expect(system).toMatch(/output prose only.*no headers, no bullet points, no markdown/i)
+    expect(system).toMatch(/never split across multiple paragraphs or separated by a blank line/i)
+    expect(system).toMatch(/do not include a draft, an alternate attempt, a self-correction/i)
+  })
+
+  test('dev/api/narrate.ts returns 502 for a malformed response rather than passing it through to the client', async () => {
+    const mod = await import('../../api/narrate')
+    const handler = mod.default
+    const { getActiveGenerator } = await import('../server/narrationGenerator')
+    const realGenerator = getActiveGenerator('groq')
+    const originalGenerate = realGenerator.generate
+    realGenerator.generate = async () => 'A rule-violating draft paragraph that should never reach the user.\n\n$64.85 is the estimated net tax on selling $15,000.00 of VTSAX.'
+    try {
+      let statusCode = 0
+      let jsonBody: unknown = null
+      const res = {
+        status(code: number) { statusCode = code; return res },
+        json(body: unknown) { jsonBody = body },
+      }
+      const config = manualRun(TAXABLE, 5000, { fund_selections: [{ fund_id: 'VTSAX', accounting_method: 'MinTax', sell_amount: 5000 }] })
+      const input = buildFundResultNarrationInput({ fundResults: config.fund_results, portfolio, accountType: 'taxable_brokerage', segment: 'C' })
+      await handler({ method: 'POST', body: { ...input, provider: 'groq' } }, res)
+      expect(statusCode).toBe(502)
+      expect(jsonBody).toMatchObject({ providerName: 'groq' })
+      // Never the raw malformed text reaching the response body at all (D066's
+      // "never surface raw provider text" rule extends naturally to this case).
+      expect(JSON.stringify(jsonBody)).not.toContain('rule-violating draft')
+    } finally {
+      realGenerator.generate = originalGenerate
+    }
+  })
+})
 
 describe('CD-4.2 boundary and failure fallback (CLAUDE.md §7, DECISIONS.md D038)', () => {
   test('fallback never claims to be AI-generated', async () => {

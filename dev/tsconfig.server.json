@@ -25,6 +25,7 @@
     "src/utils/whatIfShared.ts",
     "src/server/narrationGenerator.ts",
     "src/server/narrationPrompt.ts",
+    "src/server/narrationValidation.ts",
     "src/server/whatIfInterpreter.ts",
     "src/server/whatIfPrompt.ts",
     "src/server/whatIfResponseParser.ts",

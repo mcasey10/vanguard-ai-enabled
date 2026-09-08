@@ -72,6 +72,7 @@ export function buildNarrationPrompt(input: NarrationInput): { system: string; u
     SEGMENT_TONE[input.segment],
     TOUCHPOINT_FRAMING[input.touchpoint],
     'Output prose only — no headers, no bullet points, no markdown.',
+    'Respond with the final narration and nothing else: a single continuous block of text, never split across multiple paragraphs or separated by a blank line. Do not include a draft, an alternate attempt, a self-correction, an explanation of your own reasoning, or any commentary about these instructions — only the finished narration itself, exactly once.',
   ].join(' ')
 
   // touchpoint/tense/segment are routing/tone metadata, already folded into
