@@ -1636,3 +1636,15 @@ All three real, cold-read generations state the real percentage and use accurate
 **Pushed and verified directly** — see the confirmed final filename and live URL reported to the user at the end of this task, not inferred from the push command's own output.
 
 **Baseline**: N/A — a static `docs/` file, outside the Vite app; no code changed, nothing for `tsc`/Vitest/Playwright to exercise.
+
+### D126 — [Dev] Vercel Web Analytics added to the frontend (`@vercel/analytics`, rendered once in `main.tsx`) — committed locally, push held pending confirmation that Analytics is enabled in the Vercel dashboard
+
+**Entry point confirmed, not assumed**: this is a Vite + React app, so the generic React integration applies (`@vercel/analytics/react`), not the Next.js one. The real root render file is `dev/src/main.tsx` (`createRoot(...).render(<StrictMode><BrowserRouter><App /></BrowserRouter></StrictMode>)`). `<Analytics />` is rendered exactly once there, as a sibling of `<BrowserRouter>` inside `<StrictMode>` — outside the routing tree, not nested in `App`, not duplicated anywhere. Package added: `@vercel/analytics ^2.0.1` (`dev/package.json`, `dev/package-lock.json`).
+
+**Prerequisite not verifiable from the codebase**: Web Analytics must be enabled for this project in the Vercel dashboard (Analytics tab → Enable) — a dashboard action, not something this repo can check. **Not confirmed by this task; the push is held until the user confirms it's done.** Until enabled, the component is harmless (no data collected).
+
+**Validation**: `tsc --noEmit` clean; `npm run build` succeeds (both tsc passes plus `vite build`; bundle 467.35 kB → 470.01 kB, +2.7 kB, the analytics script); Vitest 304/304; a local dev-server page load produced no console errors. Playwright: the first run showed 6/6 failing with `ERR_CONNECTION_REFUSED` — not a regression, `playwright.config.ts` has no `webServer` block and simply expects a dev server already running on 5173, and none was up in this session. Started one, re-ran: 6/6 pass (then stopped it). Worth knowing for next time: the e2e suite silently depends on a manually started dev server.
+
+**Not verifiable locally, by design**: analytics only reports on a real Vercel deployment, so "no errors locally" is what was confirmed; real tracking data gets verified after deployment, separately.
+
+**Baseline**: `tsc --noEmit` clean, `npm run build` succeeds, Vitest 304/304, Playwright 6/6 (with dev server running).
